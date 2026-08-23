@@ -1,0 +1,53 @@
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+
+# environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.tfvars
+!deploy/aws/terraform/example.tfvars
+.terraform/
+*.tfstate*
+
+# data and trained artifacts are NEVER committed (proprietary dataset; CI uses synthetic)
+data/
+*.db
+*.sqlite*
+*.csv
+*.parquet
+*.npz
+*.npy
+*.joblib
+*.pkl
+*.pt
+*.txt.gz
+models/
+mlruns/
+mlartifacts/
+reports/predictions/
+reports/mlflow.db
+reports/runs.jsonl
+logs/
+
+# figures are regenerated; committed ones live in docs/ only
+reports/figures/
+
+# documents build locally
+*.pdf
+*.docx
+
+# os / editor
+.DS_Store
+.vscode/
+.idea/
+catboost_info/

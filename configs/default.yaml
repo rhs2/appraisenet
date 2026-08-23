@@ -1,0 +1,13 @@
+# the full study on the private dataset
+name: default
+models: []            # empty = the entire zoo
+protocol:
+  seed: 42
+  holdout_frac: 0.10
+  folds: 5
+  price_min: 2000
+  price_max: 100000
+  year_min: 1990
+  target_coverage: 0.80
+torch_epochs: 40
+torch_batch: 1024

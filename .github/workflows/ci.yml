@@ -1,0 +1,27 @@
+name: ci
+on:
+  push: {branches: [main]}
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+      - name: install
+        run: pip install -e ".[dev,tracking]"
+      - name: lint
+        run: ruff check src tests
+      - name: tests (synthetic corpus; the private dataset never reaches CI)
+        run: pytest -q
+        env: {APPRAISENET_DB: /nonexistent}
+      - name: smoke benchmark (synthetic)
+        run: appraisenet benchmark --config configs/smoke.yaml
+        env: {APPRAISENET_DB: /nonexistent}
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: docker build -t appraisenet .

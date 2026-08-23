@@ -1,0 +1,10 @@
+# fast end-to-end check on the synthetic corpus (CI runs this)
+name: smoke
+models: [ridge, random_forest, lightgbm, embed_mlp]
+max_rows: 1500
+protocol:
+  seed: 42
+  holdout_frac: 0.15
+  folds: 3
+torch_epochs: 6
+torch_batch: 512
