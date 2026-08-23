@@ -20,7 +20,8 @@ dist/
 *.tfstate*
 
 # data and trained artifacts are NEVER committed (proprietary dataset; CI uses synthetic)
-data/
+data/*
+!data/README.md
 *.db
 *.sqlite*
 *.csv
@@ -31,7 +32,8 @@ data/
 *.pkl
 *.pt
 *.txt.gz
-models/
+models/*
+!models/README.md
 mlruns/
 mlartifacts/
 reports/predictions/

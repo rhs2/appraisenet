@@ -49,24 +49,30 @@ def _comparison(res: pd.DataFrame, fig_dir: Path) -> Path:
             xerr = np.vstack([(st["holdout_mape_pct"] - st["mape_ci95_low"]).values,
                               (st["mape_ci95_high"] - st["holdout_mape_pct"]).values])
             tied = set(st.index[st["tied_with_champion"].fillna(False)])
-    fig, ax = plt.subplots(figsize=(7.2, 0.42 * len(r) + 1.2))
+    fig, ax = plt.subplots(figsize=(8.8, 0.42 * len(r) + 1.2))
     colours = [FAMILY_COLOURS.get(f, "#999999") for f in r["family"]]
     ax.barh(r["model"], r["holdout_mape_pct"], color=colours, height=0.62,
             xerr=xerr, error_kw={"lw": 0.9, "capsize": 2, "ecolor": "#333333"})
     ax.scatter(r["cv_mape_pct"], np.arange(len(r)), marker="|", s=180, color="#111111",
                label="cross-validation", zorder=3)
-    for i, (m, v, w) in enumerate(zip(r["model"], r["holdout_mape_pct"], r["holdout_within_10_pct"])):
+    # anchor annotations past the error bar and the CV tick, whichever reaches further
+    reach = r["holdout_mape_pct"].values if xerr is None else r["holdout_mape_pct"].values + xerr[1]
+    anchors = np.maximum(reach, r["cv_mape_pct"].values)
+    for i, (m, v, a, w) in enumerate(zip(r["model"], r["holdout_mape_pct"], anchors,
+                                         r["holdout_within_10_pct"])):
         mark = " †" if m in tied else ""
-        ax.annotate(f"{v:.2f}%{mark}  ({w:.0f}% within 10%)", (v, i), xytext=(5, -3),
+        ax.annotate(f"{v:.2f}%{mark}  ({w:.0f}% within 10%)", (a, i), xytext=(5, -3),
                     textcoords="offset points", fontsize=8)
+    ax.set_xlim(0, float(anchors.max()) * 1.36)
     xlabel = "holdout MAPE (%), lower is better"
     if xerr is not None:
-        xlabel += "; error bars: 95% paired-bootstrap CI, † statistically tied with the champion"
+        xlabel += "; error bars: 95% paired CI; † tied with the champion"
     ax.set_xlabel(xlabel)
     ax.set_title("AppraiseNet: model families under one leakage-free protocol")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in FAMILY_COLOURS.values()]
     ax.legend(handles + [plt.Line2D([], [], color="#111111", marker="|", ls="", ms=12)],
-              list(FAMILY_COLOURS) + ["cross-validation"], fontsize=7.5, ncol=2, loc="lower right")
+              list(FAMILY_COLOURS) + ["cross-validation"], fontsize=7.5,
+              loc="upper left", bbox_to_anchor=(1.01, 1.0))
     fig.tight_layout()
     p = fig_dir / "comparison.png"
     fig.savefig(p)
@@ -75,18 +81,24 @@ def _comparison(res: pd.DataFrame, fig_dir: Path) -> Path:
 
 
 def _coverage(res: pd.DataFrame, fig_dir: Path) -> Path:
-    fig, ax = plt.subplots(figsize=(5.6, 4.0))
-    for _, r in res.iterrows():
-        ax.scatter(r["holdout_width_pct_of_price"], r["holdout_coverage_pct"],
-                   color=FAMILY_COLOURS.get(r["family"], "#999999"), s=42, zorder=3)
-        ax.annotate(r["model"], (r["holdout_width_pct_of_price"], r["holdout_coverage_pct"]),
-                    xytext=(5, 3), textcoords="offset points", fontsize=7)
-    ax.axhline(80, color="#666666", ls="--", lw=1)
-    ax.annotate("80% target", (ax.get_xlim()[0], 80), xytext=(4, 4), textcoords="offset points",
-                fontsize=8, color="#666666")
-    ax.set_xlabel("median interval width (% of price), narrower is better")
-    ax.set_ylabel("holdout coverage (%)")
-    ax.set_title("Split-conformal 80% intervals: every model, honest coverage")
+    """Dot plot: coverage barely varies (that is the guarantee working), width is the story."""
+    r = res.sort_values("holdout_width_pct_of_price", ascending=False)
+    fig, ax = plt.subplots(figsize=(6.8, 0.36 * len(r) + 1.3))
+    for i, (_, row) in enumerate(r.iterrows()):
+        ax.scatter(row["holdout_width_pct_of_price"], i, s=64, zorder=3,
+                   color=FAMILY_COLOURS.get(row["family"], "#999999"))
+        ax.annotate(f"{row['holdout_width_pct_of_price']:.0f}% wide at "
+                    f"{row['holdout_coverage_pct']:.1f}% coverage",
+                    (row["holdout_width_pct_of_price"], i), xytext=(8, -3),
+                    textcoords="offset points", fontsize=7.5)
+    ax.set_yticks(np.arange(len(r)), r["model"], fontsize=8)
+    ax.set_xlim(0, float(r["holdout_width_pct_of_price"].max()) * 1.5)
+    cov = res["holdout_coverage_pct"]
+    ax.annotate(f"holdout coverage stays {cov.min():.1f}-{cov.max():.1f}% vs the 80% target,\n"
+                "for every model: the conformal guarantee at work",
+                (0.02, 0.03), xycoords="axes fraction", fontsize=8, color="#666666")
+    ax.set_xlabel("median 80%-interval width (% of price), narrower is better")
+    ax.set_title("Split-conformal intervals: width differs, coverage holds", fontsize=10)
     fig.tight_layout()
     p = fig_dir / "coverage_width.png"
     fig.savefig(p)
@@ -98,15 +110,22 @@ def _calibration(name: str, arr, fig_dir: Path) -> Path:
     pred, y = np.exp(arr["holdout_pred"]), arr["holdout_price"]
     dec = pd.qcut(pred, 10, duplicates="drop")
     g = pd.DataFrame({"pred": pred, "y": y, "dec": dec}).groupby("dec", observed=True).mean()
-    fig, ax = plt.subplots(figsize=(4.6, 4.2))
+    fig, ax = plt.subplots(figsize=(5.2, 4.6))
     lim = [min(g["pred"].min(), g["y"].min()) * 0.9, max(g["pred"].max(), g["y"].max()) * 1.06]
     ax.plot(lim, lim, color="#999999", lw=1, ls="--")
     ax.plot(g["pred"], g["y"], marker="o", color="#E69F00", lw=1.5)
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set_xlabel("mean predicted price (decile, $)")
-    ax.set_ylabel("mean actual price ($)")
-    ax.set_title(f"Champion calibration by predicted-price decile ({name})")
+    ticks = [t for t in (2_000, 5_000, 10_000, 20_000, 40_000, 80_000) if lim[0] <= t <= lim[1]]
+    labels = [f"${t // 1000}k" for t in ticks]
+    ax.set_xticks(ticks, labels)
+    ax.set_yticks(ticks, labels)
+    ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax.set_xlabel("mean predicted price (decile)")
+    ax.set_ylabel("mean actual price")
+    ax.set_title("Champion calibration by predicted-price decile", fontsize=10)
+    ax.annotate(name, (0.04, 0.94), xycoords="axes fraction", fontsize=8.5, color="#666666")
     fig.tight_layout()
     p = fig_dir / "calibration.png"
     fig.savefig(p)

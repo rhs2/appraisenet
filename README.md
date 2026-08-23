@@ -55,7 +55,12 @@ drift monitoring, serving API, IaC) that turns the winner into a system.
 marketplaces during 2026, VIN-decoded specs, price band $2,000-$100,000, model year
 1990+. The corpus is **proprietary and not distributed**; identity (VINs, sellers,
 platforms, precise locations, contact details) was stripped before it reached this
-project. `data/README.md` documents the schema. **The entire pipeline runs without it**:
+project. It also did not start clean: each raw record carried roughly **160 fields**,
+which curation reduced to the 26 modeling columns through field triage, VIN-decode
+enrichment against the free NHTSA vPIC decoder, junk-price and not-a-car removal,
+per-vehicle deduplication, and a label-noise quarantine that keeps mispriced listings
+out of the target. `data/README.md` documents the schema and the full curation
+pipeline. **The entire pipeline runs without it**:
 a synthetic generator with the identical schema powers the tests, CI and any curious
 reader (`APPRAISENET_DB` unset -> synthetic corpus, clearly labelled in every output).
 
