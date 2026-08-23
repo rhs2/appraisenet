@@ -8,8 +8,9 @@ with one command; nothing is described that the code does not do.
 
 Given a listing `x` (vehicle identity, specifications, mileage, seller type, coarse
 location, free-text description), predict its asking price. All models are trained on
-`y = log(price)`: prices are multiplicative (a $500 error means something different at
-$6,000 than at $60,000), log space makes errors comparable across the price range, and
+`y = log(price)`. Price errors are relative by nature: a $500 miss is a serious error
+on a cheap car yet negligible on an expensive one, so modeling in log space makes
+errors mean the same thing across the study's whole $2,000-$100,000 price band, and
 `exp()` of a symmetric interval in log space yields the asymmetric dollar interval a
 buyer actually needs.
 
