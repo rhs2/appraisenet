@@ -6,9 +6,24 @@ services:
       - ./models:/app/models
       - ./reports:/app/reports
     environment:
+      # SQLite file (default), or point at the postgres service below:
+      # APPRAISENET_DB=postgresql://appraisenet:appraisenet@db:5432/appraisenet
       - APPRAISENET_DB=/app/data/listings.db
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.12.1
     command: mlflow server --backend-store-uri sqlite:///mlflow/mlflow.db --host 0.0.0.0 --port 5000
     ports: ["5000:5000"]
     volumes: ["./reports:/mlflow"]
+  db:
+    # optional Postgres backend: docker compose --profile postgres up
+    image: postgres:16
+    profiles: ["postgres"]
+    environment:
+      - POSTGRES_DB=appraisenet
+      - POSTGRES_USER=appraisenet
+      - POSTGRES_PASSWORD=appraisenet
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+volumes:
+  pgdata:

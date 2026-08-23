@@ -37,6 +37,9 @@ mlartifacts/
 reports/predictions/
 reports/mlflow.db
 reports/runs.jsonl
+# the study's published evidence IS committed
+!reports/results.csv
+!reports/segments.csv
 logs/
 
 # figures are regenerated; committed ones live in docs/ only

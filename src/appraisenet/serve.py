@@ -2,15 +2,13 @@
 and a prediction log that feeds drift monitoring."""
 from __future__ import annotations
 
-import json
-import sqlite3
 import time
-from datetime import datetime, timezone
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from . import db
 from .env import ROOT
 from .registry import ProductionModel
 
@@ -78,12 +76,4 @@ def predict(listing: Listing):
 
 
 def _log(row: dict, out: dict) -> None:
-    PRED_DB.parent.mkdir(exist_ok=True)
-    con = sqlite3.connect(PRED_DB)
-    con.execute("""create table if not exists predictions
-                   (at text, model_version text, request json, price real, low real, high real)""")
-    con.execute("insert into predictions values (?,?,?,?,?,?)",
-                (datetime.now(timezone.utc).isoformat(timespec="seconds"), out["model_version"],
-                 json.dumps(row, default=str), out["price"], out["low"], out["high"]))
-    con.commit()
-    con.close()
+    db.log_prediction(row, out, sqlite_fallback=PRED_DB)

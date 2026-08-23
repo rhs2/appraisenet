@@ -17,14 +17,13 @@ region_zip3, description (scrubbed free text).
 """
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
+from . import db
 from .config import ProtocolCfg
-from .env import db_path
 
 CATEGORICAL = ["make", "model", "trim", "body_style", "drivetrain", "transmission", "fuel_type",
                "electrification", "gvwr_class", "series", "plant_country", "adaptive_cruise",
@@ -44,10 +43,12 @@ class Split:
 
 def load_listings(allow_synthetic: bool = True, max_rows: int | None = None,
                   seed: int = 42) -> tuple[pd.DataFrame, bool]:
-    p = db_path()
-    if p is not None:
-        df = pd.read_sql_query("select * from listings", sqlite3.connect(p))
-        synthetic = False
+    frame = db.read_listings()
+    if frame is None and db.is_postgres():
+        raise RuntimeError("PostgreSQL is configured but holds no `listings` table yet; "
+                           "load it with: appraisenet data ingest --source <listings.db|csv>")
+    if frame is not None:
+        df, synthetic = frame, False
     elif allow_synthetic:
         df = synthetic_listings(n=max_rows or 6000, seed=seed)
         synthetic = True

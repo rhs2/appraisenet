@@ -1,0 +1,5 @@
+model,family,cv_mape_pct,cv_median_ape_pct,cv_r2_log,cv_within_10_pct,holdout_mape_pct,holdout_median_ape_pct,holdout_r2_log,holdout_within_10_pct,conformal_q_log,holdout_coverage_pct,holdout_width_pct_of_price,fit_seconds
+random_forest,bagged trees,10.193,6.398,0.975,62.828,8.951,4.477,0.977,68.465,0.175,83.4,35.3,1.0
+lightgbm,boosting,9.427,5.228,0.979,65.369,9.338,4.498,0.976,68.05,0.162,82.2,32.3,22.7
+ridge,linear,26.671,23.981,0.895,20.016,25.014,22.412,0.903,22.822,0.4,78.4,81.5,1.0
+embed_mlp,deep tabular,65.113,67.519,0.362,6.354,51.571,50.708,0.56,7.469,0.919,87.1,239.1,4.3

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from appraisenet.config import load_config
-from appraisenet.data import TARGET, engineer, protocol_split, synthetic_listings
+from appraisenet.data import TARGET, engineer, load_listings, protocol_split, synthetic_listings
 from appraisenet.features import FeatureSpace, TrimTier
 from appraisenet.models import zoo
 from appraisenet.protocol import metrics, run_model
@@ -79,6 +79,35 @@ def test_run_model_end_to_end(name, split, cfg):
 
 def test_zoo_registry_complete():
     assert set(zoo.ZOO) == set(zoo.FAMILY)
+
+
+def test_storage_backend_detection(monkeypatch):
+    from appraisenet import db
+    monkeypatch.setenv("APPRAISENET_DB", "postgresql://user:secret@dbhost:5432/appraisenet")
+    assert db.is_postgres()
+    assert "secret" not in db.describe() and "dbhost" in db.describe()
+    monkeypatch.setenv("APPRAISENET_DB", "data/listings.db")
+    assert not db.is_postgres()
+
+
+def test_daily_ingest_dedup(tmp_path, monkeypatch, cfg):
+    from appraisenet import db
+    monkeypatch.setenv("APPRAISENET_DB", str(tmp_path / "grow.db"))
+    full = synthetic_listings(400, seed=11)
+    full.iloc[:300].to_csv(tmp_path / "day1.csv", index=False)
+    full.to_csv(tmp_path / "day2.csv", index=False)
+
+    day1 = db.ingest(tmp_path / "day1.csv", cfg.protocol)
+    assert 250 < day1["inserted"] <= day1["passed_gates"]
+    again = db.ingest(tmp_path / "day1.csv", cfg.protocol)
+    assert again["inserted"] == 0 and again["duplicates"] == day1["inserted"]
+    day2 = db.ingest(tmp_path / "day2.csv", cfg.protocol)
+    assert day2["inserted"] > 0
+    assert day2["total_listings"] == day1["inserted"] + day2["inserted"]
+
+    df, synthetic = load_listings()
+    assert not synthetic and len(df) == day2["total_listings"]
+    assert df["id"].is_unique
 
 
 def test_registry_and_api(tmp_path, monkeypatch, cfg):

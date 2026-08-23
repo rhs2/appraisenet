@@ -1,13 +1,13 @@
 """Drift monitoring: population-stability index between the training reference and the
-recent prediction traffic (reports/predictions.db written by serve.py)."""
+recent prediction traffic logged by serve.py (Postgres, or reports/predictions.db)."""
 from __future__ import annotations
 
 import json
-import sqlite3
 
 import numpy as np
 import pandas as pd
 
+from . import db
 from .config import Config
 from .data import engineer, load_listings
 from .env import ROOT
@@ -37,11 +37,9 @@ def psi_categorical(ref: pd.Series, cur: pd.Series, top: int = 20) -> float:
 def report(cfg: Config, hours: int = 24 * 7) -> dict:
     ref, _ = load_listings()
     ref = engineer(ref, cfg.protocol)
-    if not PRED_DB.exists():
+    rows = db.recent_predictions(hours, sqlite_fallback=PRED_DB)
+    if not rows:
         return {"ok": False, "reason": "no prediction traffic logged yet"}
-    con = sqlite3.connect(PRED_DB)
-    rows = con.execute(f"select request, price from predictions where at >= datetime('now', '-{int(hours)} hours')").fetchall()
-    con.close()
     if len(rows) < 30:
         return {"ok": False, "reason": f"only {len(rows)} predictions in the window; need 30+"}
     cur = pd.DataFrame([json.loads(r[0]) for r in rows])

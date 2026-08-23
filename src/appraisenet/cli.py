@@ -25,7 +25,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("report", help="rebuild figures from saved artifacts")
 
     d = sub.add_parser("data", help="dataset utilities")
-    d.add_argument("action", choices=["check"])
+    d.add_argument("action", choices=["check", "ingest"])
+    d.add_argument("--source", default=None,
+                   help="ingest: new listings to append - a sqlite .db (table `listings`) or a .csv")
 
     s = sub.add_parser("serve", help="run the prediction API")
     s.add_argument("--host", default="127.0.0.1")
@@ -59,10 +61,18 @@ def main(argv: list[str] | None = None) -> int:
             print("figure:", p)
         return 0
     if a.cmd == "data":
+        from . import db
         from .config import load_config
+        if a.action == "ingest":
+            import json as _json
+            if not a.source:
+                ap.error("data ingest requires --source <file.db|file.csv>")
+            print(_json.dumps(db.ingest(a.source, load_config(None).protocol), indent=1))
+            return 0
         from .data import engineer, load_listings
         df, synthetic = load_listings()
         df = engineer(df, load_config(None).protocol)
+        print("storage:", db.describe())
         print(f"{'SYNTHETIC' if synthetic else 'private'} corpus: {len(df):,} listings after protocol filters")
         print(df[["price", "year", "mileage"]].describe().round(0).to_string())
         print("makes:", df["make"].nunique(), "| models:", df["model"].nunique(),

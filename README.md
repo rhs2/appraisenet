@@ -54,6 +54,17 @@ project. `data/README.md` documents the schema. **The entire pipeline runs witho
 a synthetic generator with the identical schema powers the tests, CI and any curious
 reader (`APPRAISENET_DB` unset -> synthetic corpus, clearly labelled in every output).
 
+Storage is a single URL. `APPRAISENET_DB` accepts a SQLite file path (zero-setup
+default) or a **PostgreSQL DSN** for the production feed; every reader and writer goes
+through `src/appraisenet/db.py`, so the backend is a one-line `.env` change. The corpus
+grows day by day through `appraisenet data ingest --source <new.db|new.csv>`: incoming
+rows pass the same quality gates as training, are fingerprinted on their identifying
+fields, and only never-seen listings are appended. The ingest is idempotent by
+construction, so a daily cron can never duplicate or dirty the corpus, and each run
+of it is recorded in an
+`ingest_log` table. Migrating SQLite -> Postgres is one ingest with the old file as the
+source and the DSN as the destination.
+
 ## Production, not just a study
 
 - `appraisenet train-production`: fits the champion configuration + CQR calibration,

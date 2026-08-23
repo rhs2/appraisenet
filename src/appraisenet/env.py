@@ -27,10 +27,3 @@ def load_dotenv(path: Path | None = None) -> None:
 def env(key: str, default: str | None = None) -> str | None:
     load_dotenv()
     return os.environ.get(key, default)
-
-
-def db_path() -> Path | None:
-    """Path to the private listings DB, or None when it is not available."""
-    v = env("APPRAISENET_DB", "data/listings.db")
-    p = Path(v) if Path(v).is_absolute() else ROOT / v
-    return p if p.exists() else None
