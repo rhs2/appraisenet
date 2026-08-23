@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .compare import comparison_stats
 from .config import Config
 from .data import TARGET, engineer, load_listings, protocol_split
 from .models import zoo
@@ -50,6 +51,7 @@ def run_benchmark(cfg: Config) -> pd.DataFrame:
 
     results = pd.DataFrame(rows).sort_values("holdout_mape_pct").reset_index(drop=True)
     results.to_csv(out / "results.csv", index=False)
+    comparison_stats(out)
 
     extras = {"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "rows": len(df), "train": len(split.train), "holdout": len(split.holdout),

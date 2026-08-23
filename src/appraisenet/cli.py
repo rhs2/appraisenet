@@ -55,9 +55,15 @@ def main(argv: list[str] | None = None) -> int:
         run_benchmark(load_config(a.config, over))
         return 0
     if a.cmd == "report":
+        from .compare import comparison_stats
         from .config import load_config
         from .evaluate import make_figures
-        for p in make_figures(load_config(None).out_dir):
+        out = load_config(None).out_dir
+        stats = comparison_stats(out)
+        if stats is not None:
+            tied = stats.loc[stats["tied_with_champion"], "model"].tolist()
+            print("paired bootstrap, statistically tied for best:", ", ".join(tied))
+        for p in make_figures(out):
             print("figure:", p)
         return 0
     if a.cmd == "data":

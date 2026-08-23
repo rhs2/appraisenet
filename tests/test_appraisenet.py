@@ -81,6 +81,30 @@ def test_zoo_registry_complete():
     assert set(zoo.ZOO) == set(zoo.FAMILY)
 
 
+def test_paired_bootstrap_comparison(tmp_path):
+    import pandas as pd
+
+    from appraisenet.compare import comparison_stats
+    rng = np.random.RandomState(0)
+    y = np.log(rng.uniform(5000, 40000, 400))
+    (tmp_path / "predictions").mkdir()
+    preds = {"good": y + rng.normal(0, 0.05, 400),      # champion
+             "near": y + rng.normal(0, 0.052, 400),     # indistinguishable from it
+             "bad": y + rng.normal(0, 0.25, 400)}       # clearly worse
+    for name, p in preds.items():
+        np.savez(tmp_path / "predictions" / f"{name}.npz", holdout_pred=p, holdout_y=y,
+                 oof=p, holdout_price=np.exp(y))
+    pd.DataFrame({"model": ["good", "near", "bad"]}).to_csv(tmp_path / "results.csv", index=False)
+
+    st = comparison_stats(tmp_path, n_boot=500, seed=1).set_index("model")
+    assert st["tied_with_champion"].loc[["good", "near"]].all()
+    assert not st.loc["bad", "tied_with_champion"]
+    assert st.loc["bad", "delta_ci95_low"] > 0
+    assert (st["mape_ci95_low"] <= st["holdout_mape_pct"]).all()
+    assert (st["holdout_mape_pct"] <= st["mape_ci95_high"]).all()
+    assert (tmp_path / "comparison_stats.csv").exists()
+
+
 def test_storage_backend_detection(monkeypatch):
     from appraisenet import db
     monkeypatch.setenv("APPRAISENET_DB", "postgresql://user:secret@dbhost:5432/appraisenet")

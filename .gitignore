@@ -39,6 +39,7 @@ reports/mlflow.db
 reports/runs.jsonl
 # the study's published evidence IS committed
 !reports/results.csv
+!reports/comparison_stats.csv
 !reports/segments.csv
 logs/
 

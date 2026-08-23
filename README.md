@@ -32,6 +32,11 @@ drift monitoring, serving API, IaC) that turns the winner into a system.
 - **Money metrics**: MAPE, median APE, R2 in log space, share of cars within 10%, and
   interval coverage/width, reported overall and on the slices where pricing models hide
   their weaknesses (cheap, old, high-mileage, private-party cars).
+- **Differences are tested, not eyeballed**: every model predicts the same holdout cars,
+  so a **paired bootstrap** (4,000 resamples of the shared holdout) puts a 95% confidence
+  interval on each MAPE and on each model's gap to the champion. Models whose gap
+  interval includes zero are reported as **statistically tied**; the study never claims a
+  ranking the data cannot support.
 
 ## The model zoo
 

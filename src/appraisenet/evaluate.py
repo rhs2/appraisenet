@@ -41,15 +41,28 @@ def make_figures(out: Path) -> list[Path]:
 
 def _comparison(res: pd.DataFrame, fig_dir: Path) -> Path:
     r = res.sort_values("holdout_mape_pct", ascending=False)
+    stats_path = fig_dir.parent / "comparison_stats.csv"
+    xerr, tied = None, set()
+    if stats_path.exists():
+        st = pd.read_csv(stats_path).set_index("model").reindex(r["model"])
+        if st["mape_ci95_low"].notna().all():
+            xerr = np.vstack([(st["holdout_mape_pct"] - st["mape_ci95_low"]).values,
+                              (st["mape_ci95_high"] - st["holdout_mape_pct"]).values])
+            tied = set(st.index[st["tied_with_champion"].fillna(False)])
     fig, ax = plt.subplots(figsize=(7.2, 0.42 * len(r) + 1.2))
     colours = [FAMILY_COLOURS.get(f, "#999999") for f in r["family"]]
-    ax.barh(r["model"], r["holdout_mape_pct"], color=colours, height=0.62)
+    ax.barh(r["model"], r["holdout_mape_pct"], color=colours, height=0.62,
+            xerr=xerr, error_kw={"lw": 0.9, "capsize": 2, "ecolor": "#333333"})
     ax.scatter(r["cv_mape_pct"], np.arange(len(r)), marker="|", s=180, color="#111111",
                label="cross-validation", zorder=3)
-    for i, (v, w) in enumerate(zip(r["holdout_mape_pct"], r["holdout_within_10_pct"])):
-        ax.annotate(f"{v:.2f}%  ({w:.0f}% within 10%)", (v, i), xytext=(4, -3),
+    for i, (m, v, w) in enumerate(zip(r["model"], r["holdout_mape_pct"], r["holdout_within_10_pct"])):
+        mark = " †" if m in tied else ""
+        ax.annotate(f"{v:.2f}%{mark}  ({w:.0f}% within 10%)", (v, i), xytext=(5, -3),
                     textcoords="offset points", fontsize=8)
-    ax.set_xlabel("holdout MAPE (%), lower is better")
+    xlabel = "holdout MAPE (%), lower is better"
+    if xerr is not None:
+        xlabel += "; error bars: 95% paired-bootstrap CI, † statistically tied with the champion"
+    ax.set_xlabel(xlabel)
     ax.set_title("AppraiseNet: model families under one leakage-free protocol")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in FAMILY_COLOURS.values()]
     ax.legend(handles + [plt.Line2D([], [], color="#111111", marker="|", ls="", ms=12)],
