@@ -3,6 +3,11 @@
 **Calibrated used-vehicle price estimation: classical, deep and hybrid learners under one
 leakage-free protocol, wrapped in a production learning loop.**
 
+[![CI](https://github.com/rhs2/appraisenet/actions/workflows/ci.yml/badge.svg)](https://github.com/rhs2/appraisenet/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 AppraiseNet asks a question every applied pricing team faces: *given ~39,000 real used-car
 listings, which learning approach actually prices cars best, and how honest can its
 uncertainty be?* It answers with a controlled comparison of six model families under a
@@ -37,6 +42,9 @@ drift monitoring, serving API, IaC) that turns the winner into a system.
   interval on each MAPE and on each model's gap to the champion. Models whose gap
   interval includes zero are reported as **statistically tied**; the study never claims a
   ranking the data cannot support.
+
+The complete methodology, every hyper-parameter and formula included, is in
+[docs/METHODS.md](docs/METHODS.md).
 
 ## The model zoo
 
@@ -105,11 +113,14 @@ pytest -q                                   # everything runs on synthetic data
 
 ```
 configs/            experiment configurations (default, smoke)
-src/appraisenet/    data, features, protocol, model zoo (models/), benchmark, evaluate,
-                    registry, serve, monitor, tracking, cli
+src/appraisenet/    data, db, features, protocol, model zoo (models/), benchmark,
+                    compare, evaluate, registry, serve, monitor, tracking, cli
+docs/               METHODS.md (full methodology) + committed result figures
+data/               schema + curation documentation (the corpus itself is never here)
+models/             production registry (populated by train-production, never committed)
 tests/              pytest suite (synthetic corpus only)
 scripts/            README results updater, pre-push leak scan
-reports/            results.csv, segments.csv, figures/, model_cards/ (generated)
+reports/            results, comparison stats, segments, figures, model cards (generated)
 deploy/aws/         Terraform (ECR, ECS Fargate, ALB, RDS, S3) + deployment notes
 ```
 

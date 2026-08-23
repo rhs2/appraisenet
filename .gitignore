@@ -52,6 +52,9 @@ reports/figures/
 *.pdf
 *.docx
 
+# the leak scanner's project-specific patterns must never be published
+scripts/private_patterns.txt
+
 # os / editor
 .DS_Store
 .vscode/

@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software or study, please cite it as below."
+type: software
+title: "AppraiseNet: Calibrated Used-Vehicle Price Estimation with Classical, Deep and Hybrid Learners"
+authors:
+  - family-names: Sium
+    given-names: Rakibul Hasan
+repository-code: "https://github.com/rhs2/appraisenet"
+license: MIT
+date-released: "2026-08-24"
+keywords:
+  - price-estimation
+  - tabular-machine-learning
+  - conformal-prediction
+  - gradient-boosting
+  - deep-learning

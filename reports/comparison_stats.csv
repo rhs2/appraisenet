@@ -1,5 +1,12 @@
 model,holdout_mape_pct,mape_ci95_low,mape_ci95_high,delta_vs_champion,delta_ci95_low,delta_ci95_high,tied_with_champion
-random_forest,13.495,13.031,13.967,2.252,1.932,2.578,False
-lightgbm,11.243,10.877,11.621,0.0,0.0,0.0,True
-ridge,18.935,18.342,19.526,7.692,7.177,8.217,False
-embed_mlp,11.944,11.551,12.336,0.701,0.454,0.95,False
+blend_lgbm_catboost,11.081,10.715,11.449,0.0,0.0,0.0,True
+xgboost,11.19,10.811,11.571,0.109,-0.064,0.276,True
+lightgbm,11.243,10.877,11.621,0.162,0.045,0.277,False
+catboost,11.582,11.191,11.977,0.501,0.387,0.615,False
+embed_mlp,11.944,11.551,12.336,0.863,0.643,1.087,False
+ft_transformer,12.357,11.953,12.763,1.276,1.024,1.516,False
+extra_trees,12.877,12.44,13.317,1.796,1.535,2.071,False
+random_forest,13.495,13.031,13.967,2.414,2.121,2.724,False
+knn_comparables,15.216,14.736,15.715,4.135,3.752,4.528,False
+ridge,18.935,18.342,19.526,7.854,7.368,8.349,False
+elasticnet,19.418,18.791,20.041,8.337,7.812,8.86,False
