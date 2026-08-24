@@ -1,7 +1,7 @@
 # AppraiseNet
 
-**Calibrated used-vehicle price estimation: classical, deep and hybrid learners under one
-leakage-free protocol, wrapped in a production learning loop.**
+**Calibrated used-vehicle price estimation: classical, deep and hybrid learners compared
+under the AppraiseNet Evaluation Protocol, wrapped in a production learning loop.**
 
 [![CI](https://github.com/rhs2/appraisenet/actions/workflows/ci.yml/badge.svg)](https://github.com/rhs2/appraisenet/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -10,8 +10,8 @@ leakage-free protocol, wrapped in a production learning loop.**
 
 AppraiseNet asks a question every applied pricing team faces: *given ~39,000 real used-car
 listings, which learning approach actually prices cars best, and how honest can its
-uncertainty be?* It answers with a controlled comparison of six model families under a
-single evaluation protocol, distribution-free 80% prediction intervals for every model,
+uncertainty be?* It answers with a controlled comparison of six model families under the
+**AppraiseNet Evaluation Protocol (AEP)**, distribution-free 80% prediction intervals for every model,
 and the full production machinery (versioned registry, promote-or-rollback retraining,
 drift monitoring, serving API, IaC) that turns the winner into a system.
 
@@ -63,7 +63,7 @@ Production interval (conformalised quantile regression on the production configu
 
 <!-- RESULTS:END -->
 
-## The protocol (why these numbers can be trusted)
+## The AppraiseNet Evaluation Protocol (why these numbers can be trusted)
 
 - **One untouched holdout** (10%, fixed seed) scored exactly once per model; every other
   number is 5-fold cross-validation on the training partition.

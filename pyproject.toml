@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "appraisenet"
 version = "0.1.0"
-description = "AppraiseNet: calibrated used-vehicle price estimation - classical, deep and hybrid learners under one leakage-free protocol, with a production learning loop."
+description = "AppraiseNet: calibrated used-vehicle price estimation - classical, deep and hybrid learners compared under the AppraiseNet Evaluation Protocol, with a production learning loop."
 authors = [{name = "Rakibul Hasan Sium"}]
 readme = "README.md"
 license = {text = "MIT"}

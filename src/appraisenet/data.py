@@ -1,4 +1,4 @@
-"""Data access: the private listings database, the leakage-free protocol split, and a
+"""Data access: the private listings database, the AppraiseNet Evaluation Protocol split, and a
 synthetic corpus with the identical schema so the entire pipeline (and CI) runs without
 the proprietary data.
 

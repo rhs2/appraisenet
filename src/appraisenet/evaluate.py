@@ -68,7 +68,7 @@ def _comparison(res: pd.DataFrame, fig_dir: Path) -> Path:
     if xerr is not None:
         xlabel += "; error bars: 95% paired CI; † tied with the champion"
     ax.set_xlabel(xlabel)
-    ax.set_title("AppraiseNet: model families under one leakage-free protocol")
+    ax.set_title("Model families under the AppraiseNet Evaluation Protocol")
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in FAMILY_COLOURS.values()]
     ax.legend(handles + [plt.Line2D([], [], color="#111111", marker="|", ls="", ms=12)],
               list(FAMILY_COLOURS) + ["cross-validation"], fontsize=7.5,

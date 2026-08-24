@@ -37,7 +37,7 @@ Engineered per row before splitting: `age = current_year - year` (clipped at 0) 
 `miles_per_year = mileage / max(age, 1)`. The target `log_price` is set after the
 price-band filter, so the band never peeks at evaluation labels.
 
-## 3. Evaluation protocol
+## 3. The AppraiseNet Evaluation Protocol (AEP)
 
 - **Split**: a 10% holdout drawn once with seed 42. It is scored exactly once per model
   and never used for any selection decision.

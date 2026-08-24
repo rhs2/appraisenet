@@ -1,4 +1,4 @@
-"""The evaluation protocol: one honest procedure applied to every model.
+"""The AppraiseNet Evaluation Protocol (AEP): one honest procedure applied to every model.
 
 Per model:
   1. K-fold cross-validation on the training partition. The `FeatureSpace` (categorical
