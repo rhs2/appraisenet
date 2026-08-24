@@ -21,8 +21,17 @@ PATTERNS: list[tuple[str, re.Pattern]] = [
     ("home path", re.compile(r"/Users/[a-z]+/|C:\\\\Users\\\\", re.IGNORECASE)),
 ]
 PRIVATE = ROOT / "scripts" / "private_patterns.txt"
+ALLOWED_FILE = ROOT / "scripts" / "allowed_matches.txt"
 ALLOW = {"scripts/leak_scan.py"}
-SKIP_SUFFIX = {".png", ".joblib", ".db", ".npz"}
+SKIP_SUFFIX = {".png", ".joblib", ".db", ".npz", ".pdf", ".docx"}
+
+
+def load_allowed() -> set[str]:
+    """Exact matched strings that are published on purpose (author contact details)."""
+    if not ALLOWED_FILE.exists():
+        return set()
+    return {line.strip() for line in ALLOWED_FILE.read_text().splitlines()
+            if line.strip() and not line.startswith("#")}
 
 
 def load_private() -> int:
@@ -39,6 +48,7 @@ def load_private() -> int:
 
 def main() -> int:
     n_private = load_private()
+    allowed = load_allowed()
     files = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard"],
                            cwd=ROOT, capture_output=True, text=True).stdout.split()
     bad = 0
@@ -52,6 +62,8 @@ def main() -> int:
             continue
         for label, rx in PATTERNS:
             for m in rx.finditer(text):
+                if m.group(0) in allowed:
+                    continue
                 line = text[:m.start()].count("\n") + 1
                 print(f"LEAK {f}:{line}  [{label}]  ...{text[max(0, m.start()-30):m.end()+30].strip()!r}...")
                 bad += 1

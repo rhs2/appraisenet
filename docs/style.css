@@ -1,0 +1,58 @@
+:root {
+  --bg: #ffffff; --ink: #1c2430; --muted: #5f6b7a; --line: #e2e6eb; --accent: #1f4fa3; --card: #f5f7fa; --code: #f0f2f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1419; --ink: #e6e9ee; --muted: #9aa5b3; --line: #2a333f; --accent: #7aa7ff; --card: #161d26; --code: #1b232d; }
+  img { background: #fff; border-radius: 6px; }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 Georgia, "Times New Roman", serif; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.sitenav { max-width: 960px; margin: 0 auto; padding: 14px 20px; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; border-bottom: 1px solid var(--line); }
+.sitenav a { margin-right: 18px; color: var(--muted); }
+.sitenav a.active, .sitenav a:hover { color: var(--accent); }
+.hero { max-width: 960px; margin: 0 auto; padding: 48px 20px 24px; text-align: center; }
+.hero h1 { font-size: 2.1rem; line-height: 1.2; margin: 0 0 18px; }
+.authors { color: var(--muted); margin: 0 0 22px; }
+.links .btn { display: inline-block; margin: 4px; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 999px; font: 600 14px system-ui, sans-serif; }
+.links .btn:hover { background: var(--accent); color: #fff; text-decoration: none; }
+main { max-width: 960px; margin: 0 auto; padding: 0 20px 60px; }
+section { margin: 40px 0; }
+h2 { font-size: 1.45rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin: 0 0 14px; }
+h3 { font-size: 1.15rem; margin: 22px 0 8px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 16px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.card .num { font: 700 1.5rem system-ui, sans-serif; color: var(--accent); margin-bottom: 6px; }
+.card p { margin: 0; font-size: 0.95rem; color: var(--muted); }
+.findings li { margin-bottom: 8px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font: 600 13px system-ui, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.muted { color: var(--muted); font-size: 0.9em; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+figure { margin: 0; }
+figure img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; }
+figcaption { font-size: 0.88rem; color: var(--muted); margin-top: 6px; }
+img.wide { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; margin: 10px 0 16px; }
+pre { background: var(--code); padding: 14px; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+footer { max-width: 960px; margin: 0 auto; padding: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
+/* pandoc-rendered paper and thesis */
+header#title-block-header { max-width: 860px; margin: 30px auto 0; padding: 0 20px; text-align: center; }
+header#title-block-header h1.title { font-size: 1.9rem; line-height: 1.25; }
+header#title-block-header p.author { color: var(--muted); }
+header#title-block-header div.abstract { text-align: left; margin-top: 18px; }
+header#title-block-header div.abstract p { margin: 6px 0; }
+header#title-block-header .abstract-title { font-weight: 700; text-align: center; }
+nav#TOC { max-width: 860px; margin: 20px auto; padding: 14px 20px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-size: 0.95rem; }
+nav#TOC ul { margin: 4px 0; padding-left: 20px; }
+body > h1, body > h2, body > h3, body > h4, body > h5, body > h6, body > p, body > ul, body > ol, body > dl, body > div, body > figure, body > table, body > pre, body > blockquote, body > section { max-width: 860px; margin-left: auto; margin-right: auto; }
+body > p, body > ul, body > ol, body > dl, body > pre, body > table, body > blockquote { padding-left: 20px; padding-right: 20px; }
+body > h1, body > h2, body > h3, body > h4, body > h5, body > h6 { padding: 0 20px; }
+body > h4, body > h5 { font-size: 1.05rem; margin-top: 18px; margin-bottom: 6px; }
+body > figure img, body > div figure img, figure img { max-width: 100%; }
+body > table, body > div > table { font-size: 0.88rem; }
+caption, .caption { font-size: 0.88rem; color: var(--muted); text-align: left; padding: 6px 0; }

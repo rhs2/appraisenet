@@ -5,7 +5,10 @@ title: "AppraiseNet: Calibrated Used-Vehicle Price Estimation with Classical, De
 authors:
   - family-names: Sium
     given-names: Rakibul Hasan
+  - family-names: Finstuen
+    given-names: Drew
 repository-code: "https://github.com/rhs2/appraisenet"
+url: "https://rhs2.github.io/appraisenet/"
 license: MIT
 date-released: "2026-08-24"
 keywords:

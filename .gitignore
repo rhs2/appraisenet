@@ -48,12 +48,17 @@ logs/
 # figures are regenerated; committed ones live in docs/ only
 reports/figures/
 
-# documents build locally
+# documents build locally; the published paper PDF ships with the Pages site
 *.pdf
 *.docx
+!docs/*.pdf
+paper/main.log
+paper/main.aux
+paper/title.tex
 
 # the leak scanner's project-specific patterns must never be published
 scripts/private_patterns.txt
+scripts/allowed_matches.txt
 
 # os / editor
 .DS_Store

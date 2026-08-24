@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AppraiseNet: Calibrated Used-Vehicle Price Estimation with Classical, Deep and Hybrid Learners</title>
+<meta name="description" content="Thirteen price estimators in six families compared under the AppraiseNet Evaluation Protocol on 38,758 curated US used-vehicle listings, with distribution-free 80% prediction intervals, paired-bootstrap significance testing and a production learning loop.">
+<meta property="og:title" content="AppraiseNet: Calibrated Used-Vehicle Price Estimation">
+<meta property="og:description" content="A text-corrected LightGBM hybrid reaches 10.75% holdout MAPE with honest 80% intervals; every claimed difference is bootstrap-tested.">
+<meta property="og:image" content="https://rhs2.github.io/appraisenet/figures/comparison.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="sitenav"><a href="index.html" class="active">Project page</a> <a href="paper.html">Paper</a> <a href="Sium_Finstuen_2026_AppraiseNet.pdf">PDF</a> <a href="https://github.com/rhs2/appraisenet">Code</a></nav>
+
+<header class="hero">
+  <h1>AppraiseNet: Calibrated Used-Vehicle Price Estimation with Classical, Deep and Hybrid Learners</h1>
+  <p class="authors"><b>Rakibul Hasan Sium</b> and <b>Drew Finstuen</b><br>Lykios<br>
+  <a href="mailto:sio@lykios.com">sio@lykios.com</a> &nbsp;&middot;&nbsp; <a href="mailto:drew@lykios.com">drew@lykios.com</a></p>
+  <p class="links">
+    <a class="btn" href="paper.html">Read the paper</a>
+    <a class="btn" href="Sium_Finstuen_2026_AppraiseNet.pdf">Download the PDF</a>
+    <a class="btn" href="https://github.com/rhs2/appraisenet">Code</a>
+  </p>
+</header>
+
+<main>
+<section>
+  <h2>In one paragraph</h2>
+  <p>Used-car valuation studies usually report one accuracy number for one model, without asking whether the evaluation leaked target information, whether the claimed ranking would survive a statistical test, or how wide the honest uncertainty really is. AppraiseNet compares <b>thirteen estimators in six families</b> (linear, instance-based, bagged trees, gradient boosting, deep tabular networks and hybrids) on <b>38,758 curated US used-vehicle listings</b> under the <b>AppraiseNet Evaluation Protocol</b>: a fixed 10% holdout scored exactly once per model, five-fold out-of-fold selection, and every fitted statistic re-learned inside each fold, including an engineered trim-positioning feature that would otherwise leak the target. Split-conformal calibration gives every model a distribution-free 80% prediction interval, and model differences are judged with a paired bootstrap on the shared holdout. The study ships as an operable system: a versioned model registry with promote-or-rollback retraining, an idempotent daily data-ingest path, drift monitoring and a serving API. Every number on this page regenerates from persisted artifacts with one command.</p>
+</section>
+
+<section>
+  <h2>Key findings</h2>
+  <div class="cards">
+    <div class="card"><div class="num">10.75%</div><p>Holdout MAPE of the champion: a LightGBM base corrected, within safe bounds, by a ridge model over TF-IDF features of the listing description. 62.4% of cars priced within 10%.</p></div>
+    <div class="card"><div class="num">+0.49 pts</div><p>What the listing text is worth: the hybrid's statistically significant improvement over its own tabular base. It also beats a stacked ensemble of three tree learners.</p></div>
+    <div class="card"><div class="num">79.6 to 80.9%</div><p>Empirical holdout coverage of the 80% conformal intervals across all thirteen models. The guarantee holds; only the width differs between models.</p></div>
+    <div class="card"><div class="num">4,000</div><p>Paired-bootstrap resamples of the shared holdout behind every confidence interval. The champion's lead is significant; the group behind it is closely ordered, not settled.</p></div>
+  </div>
+  <ul class="findings">
+    <li><b>Boosting dominates the single-model field.</b> LightGBM, XGBoost and CatBoost score 11.19 to 11.58% MAPE; LightGBM and XGBoost are statistically indistinguishable.</li>
+    <li><b>Deep tabular models land behind boosting.</b> The in-repo entity-embedding MLP (11.94%) and FT-Transformer (12.36%) are competitive but significantly worse, reproducing the published tabular-learning pattern on a real commercial task.</li>
+    <li><b>The hard segments are shared.</b> Every strong model struggles on the same cars: under $10k, older than ten years, beyond 150k miles, private-party sellers (16 to 21% MAPE) against about 7% on recent mid-band cars.</li>
+    <li><b>Production serves the best text-free configuration</b> (LightGBM with a conformalised quantile-regression interval: 80.2% coverage at a median width of 33.3% of price), because the prediction API receives specs without a listing description.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>All thirteen models, one protocol</h2>
+  <p>CV is five-fold out-of-fold MAPE on the training partition; every holdout column is one scoring pass on the untouched split. The 95% CI is a paired bootstrap of the shared holdout. Coverage and width describe each model's 80% conformal interval.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Model</th><th>Family</th><th>CV MAPE</th><th>Holdout MAPE</th><th>95% CI</th><th>Median APE</th><th>Within 10%</th><th>Coverage</th><th>Width</th></tr></thead>
+    <tbody>
+      <tr><td>LightGBM + text residual</td><td>hybrid</td><td>10.91%</td><td><b>10.75%</b></td><td>[10.40, 11.12]</td><td>7.33%</td><td>62.4%</td><td>79.8%</td><td>33.3%</td></tr>
+      <tr><td>Stacked ensemble</td><td>hybrid</td><td>11.16%</td><td><b>11.02%</b></td><td>[10.65, 11.39]</td><td>7.58%</td><td>61.1%</td><td>79.7%</td><td>34.3%</td></tr>
+      <tr><td>LightGBM+CatBoost blend</td><td>hybrid</td><td>11.14%</td><td><b>11.08%</b></td><td>[10.71, 11.45]</td><td>7.48%</td><td>60.6%</td><td>79.9%</td><td>34.0%</td></tr>
+      <tr><td>XGBoost</td><td>boosting</td><td>11.37%</td><td><b>11.19%</b></td><td>[10.81, 11.57]</td><td>7.59%</td><td>60.6%</td><td>79.9%</td><td>34.8%</td></tr>
+      <tr><td>LightGBM</td><td>boosting</td><td>11.40%</td><td><b>11.24%</b></td><td>[10.88, 11.62]</td><td>7.63%</td><td>60.6%</td><td>79.6%</td><td>34.9%</td></tr>
+      <tr><td>CatBoost</td><td>boosting</td><td>11.58%</td><td><b>11.58%</b></td><td>[11.19, 11.98]</td><td>8.05%</td><td>58.2%</td><td>80.0%</td><td>35.5%</td></tr>
+      <tr><td>Embedding MLP</td><td>deep tabular</td><td>12.19%</td><td><b>11.94%</b></td><td>[11.55, 12.34]</td><td>8.44%</td><td>56.7%</td><td>79.9%</td><td>37.2%</td></tr>
+      <tr><td>FT-Transformer</td><td>deep tabular</td><td>12.76%</td><td><b>12.36%</b></td><td>[11.95, 12.76]</td><td>8.90%</td><td>54.7%</td><td>80.9%</td><td>39.9%</td></tr>
+      <tr><td>ExtraTrees</td><td>bagged trees</td><td>13.11%</td><td><b>12.88%</b></td><td>[12.44, 13.32]</td><td>8.54%</td><td>55.6%</td><td>79.9%</td><td>39.9%</td></tr>
+      <tr><td>RandomForest</td><td>bagged trees</td><td>13.73%</td><td><b>13.49%</b></td><td>[13.03, 13.97]</td><td>9.24%</td><td>53.0%</td><td>80.1%</td><td>41.9%</td></tr>
+      <tr><td>k-NN comparables</td><td>instance</td><td>15.54%</td><td><b>15.22%</b></td><td>[14.74, 15.71]</td><td>10.79%</td><td>47.0%</td><td>80.5%</td><td>47.9%</td></tr>
+      <tr><td>Ridge</td><td>linear</td><td>18.90%</td><td><b>18.93%</b></td><td>[18.34, 19.53]</td><td>14.18%</td><td>37.7%</td><td>80.1%</td><td>58.7%</td></tr>
+      <tr><td>Elastic net</td><td>linear</td><td>19.32%</td><td><b>19.42%</b></td><td>[18.79, 20.04]</td><td>14.43%</td><td>36.5%</td><td>79.8%</td><td>60.2%</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Figures</h2>
+  <img src="figures/comparison.png" alt="Holdout MAPE of all thirteen models with bootstrap confidence intervals" class="wide">
+  <div class="gallery">
+    <figure><img src="figures/coverage_width.png" alt="Interval width and coverage per model"><figcaption>Split-conformal intervals: coverage holds for every model; width is what differs, from 34% of price (hybrids) to 60% (linear).</figcaption></figure>
+    <figure><img src="figures/calibration.png" alt="Champion calibration by predicted-price decile"><figcaption>Champion calibration: predicted and realised prices agree in every decile; mild overprediction only on the cheapest cars.</figcaption></figure>
+    <figure><img src="figures/error_ecdf.png" alt="Error distribution of the top models"><figcaption>Error distribution of the four strongest models on the holdout.</figcaption></figure>
+    <figure><img src="figures/segments.png" alt="Holdout MAPE by segment"><figcaption>Where pricing is hard: cheap, old, high-mileage and private-party cars, for every strong model alike.</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>The AppraiseNet Evaluation Protocol</h2>
+  <ol>
+    <li>A 10% holdout (3,893 listings) is drawn once with a fixed seed and scored exactly once per model; it takes part in no selection decision.</li>
+    <li>Every fitted statistic is learned inside its cross-validation fold: categorical vocabularies, imputation, standardisation, and the engineered trim-tier feature (a trim's price positioning within its model line), which would leak the target if computed on the full data.</li>
+    <li>Out-of-fold predictions supply the selection metrics and the conformal calibration residuals; each model is then refitted on the full training partition and predicts the holdout once.</li>
+    <li>Split-conformal calibration in log space gives every model an 80% interval with a distribution-free guarantee; the production model uses conformalised quantile regression for per-car adaptive widths.</li>
+    <li>Differences are tested, not eyeballed: a paired bootstrap (4,000 resamples of the shared holdout) puts a 95% confidence interval on each MAPE and on each gap to the champion.</li>
+  </ol>
+  <p>The corpus of 38,758 listings was curated from roughly 160 raw fields per record down to 26 modelling columns: vocabulary normalisation, government VIN-decoder enrichment, junk-price and not-a-car removal, per-vehicle deduplication and a label-noise quarantine. The data is proprietary and never ships; a synthetic generator with the identical schema reproduces the whole pipeline, tests and CI.</p>
+</section>
+
+<section>
+  <h2>A study you can operate</h2>
+  <ul>
+    <li><b>Storage</b> is one URL: an embedded database file or a PostgreSQL connection string; the corpus grows through an idempotent, fingerprint-deduplicated daily ingest with an audit table.</li>
+    <li><b>Retraining</b> is guarded: a candidate is promoted only if it scores within 0.3 MAPE points of the serving model, otherwise the previous version keeps serving; versions are semantic and archived for rollback.</li>
+    <li><b>Serving</b> returns the point price with its calibrated interval, hot-reloads on promotion and logs every prediction; a drift monitor watches recent traffic with population-stability indices.</li>
+    <li><b>Reproducibility</b>: model cards per learner, MLflow tracking, pytest and CI on the synthetic corpus, Docker and Terraform for AWS. One command re-runs the study; one command rebuilds this page's numbers, the figures and the paper.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Citation</h2>
+  <p>Sium, R. H. and Finstuen, D. (2026). <i>AppraiseNet: Calibrated used-vehicle price estimation with classical, deep and hybrid learners</i> [Paper, project page and source code]. Lykios. https://rhs2.github.io/appraisenet/</p>
+<pre><code>@misc{sium2026appraisenet,
+  author       = {Sium, Rakibul Hasan and Finstuen, Drew},
+  title        = {AppraiseNet: Calibrated Used-Vehicle Price Estimation
+                  with Classical, Deep and Hybrid Learners},
+  year         = {2026},
+  howpublished = {Paper, project page and source code},
+  url          = {https://rhs2.github.io/appraisenet/}
+}</code></pre>
+</section>
+</main>
+
+<footer><p>Rakibul Hasan Sium and Drew Finstuen, Lykios, 2026. Code under the MIT licence; the corpus is proprietary and is not redistributed.</p></footer>
+</body>
+</html>

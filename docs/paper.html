@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.10.2" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Rakibul Hasan Sium and Drew Finstuen, Lykios (sio@lykios.com, drew@lykios.com)" />
+  <title>AppraiseNet: Calibrated Used-Vehicle Price Estimation with Classical, Deep and Hybrid Learners</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <link rel="stylesheet" href="style.css" />
+  <script defer=""
+  src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<nav class="sitenav"><a href="index.html">Project page</a> <a href="paper.html" class="active">Paper</a> <a href="Sium_Finstuen_2026_AppraiseNet.pdf">PDF</a> <a href="https://github.com/rhs2/appraisenet">Code</a></nav>
+
+<header id="title-block-header">
+<h1 class="title">AppraiseNet: Calibrated Used-Vehicle Price Estimation
+with Classical, Deep and Hybrid Learners</h1>
+<p class="author">Rakibul Hasan Sium and Drew Finstuen, Lykios
+(sio@lykios.com, drew@lykios.com)</p>
+<div class="abstract">
+<div class="abstract-title">Abstract</div>
+<p>Automated valuation of used vehicles is usually reported as a single
+accuracy number for a single model class, with little attention to
+whether the evaluation could leak target information, whether the
+reported ranking of methods would survive a statistical test, or whether
+the model can state its own uncertainty honestly. We present
+AppraiseNet, a study of thirteen price estimators in six families
+(linear, instance-based, bagged trees, gradient boosting, deep tabular
+networks and hybrids) trained on 38<span>,</span>758 curated United
+States used-vehicle listings, together with the production system that
+operates the result. All models are compared under the AppraiseNet
+Evaluation Protocol: a fixed 10 percent holdout scored exactly once per
+model, five-fold out-of-fold selection, and every fitted statistic,
+including an engineered trim-positioning feature, re-learned inside each
+fold. Split-conformal calibration gives every model a distribution-free
+80 percent prediction interval, and model differences are judged with a
+paired bootstrap on the shared holdout rather than by comparing point
+estimates. Gradient boosting dominates the single-model field, both deep
+architectures land behind it, and the best model overall is a hybrid
+that corrects a LightGBM base with a bounded ridge model over TF-IDF
+features of the listing description: 10.75 percent holdout MAPE
+(95 percent CI 10.40 to 11.12), a median absolute error of 7.33 percent,
+and 62.4 percent of cars priced within 10 percent, a statistically
+significant 0.49-point improvement over its own tabular base. Empirical
+interval coverage lies between 79.6 and 80.9 percent for all thirteen
+models against the 80 percent target, and conformalised quantile
+regression attains 80.2 percent coverage at a median width of
+33.3 percent of price. The study ships as an operable system with a
+versioned registry, promote-or-rollback retraining, an idempotent daily
+data-ingest path, drift monitoring and a serving API.</p>
+</div>
+</header>
+<p><strong>Index Terms:</strong> Price estimation, used vehicles,
+tabular machine learning, gradient boosting, conformal prediction,
+evaluation methodology, text mining, MLOps.</p>
+<h1 id="introduction">Introduction</h1>
+<p>Pricing a used car is a canonical applied regression problem: the
+target is continuous and strictly positive, the features mix
+high-cardinality categoricals (make, model, trim) with numerics
+(mileage, age, engine specifications) and free text (the listing
+description), and errors carry direct monetary meaning for buyers,
+sellers and lenders. Commercial valuation guides answer it at scale, but
+the academic record is thin in three specific ways. First, published
+comparisons of learning methods for car prices are frequently vulnerable
+to target leakage: statistics fitted on the full dataset, engineered
+features that summarise prices across the evaluation rows, or repeated
+scoring of the same test split during development [5, 6]. Second, method
+rankings are almost always asserted from two point estimates, although
+the difference between well-tuned learners on the same data is often
+smaller than the resampling noise of the split [7]. Third, point
+estimates are reported without calibrated uncertainty, although a buyer
+needs to know whether “$17,400” means plus or minus $800 or plus or
+minus $5,000.</p>
+<p>This paper treats these three gaps as the object of study. We compare
+thirteen estimators in six families under one fixed procedure, the
+AppraiseNet Evaluation Protocol (Section 4), on 38<span>,</span>758
+curated real listings (Section 3); we attach a distribution-free
+80 percent prediction interval to every model via split-conformal
+calibration and an adaptive interval to the production model via
+conformalised quantile regression [18, 19, 20] (Section 6); and we judge
+every claimed difference with a paired bootstrap over the shared holdout
+[8] (Section 7). Finally, because a study that cannot be operated tends
+to decay, the reference implementation is a production system: a
+versioned model registry with a promote-or-rollback guardrail, an
+idempotent ingest path that grows the corpus daily, drift monitoring and
+a serving API (Section 9).</p>
+<p>The contributions are:</p>
+<ol>
+<li><p>A controlled comparison of six model families for used-vehicle
+price estimation on 38<span>,</span>758 curated listings, under a
+protocol in which every fitted statistic, including an engineered
+trim-positioning feature that would otherwise leak the target, is
+re-learned inside each cross-validation fold, and the holdout is scored
+exactly once per model.</p></li>
+<li><p>Evidence that listing text carries pricing signal beyond the
+structured specification: a bounded text-residual hybrid improves its
+own LightGBM base by 0.49 MAPE points, a statistically significant
+margin, and outperforms a stacked ensemble of three tree
+learners.</p></li>
+<li><p>Calibrated uncertainty for every model: empirical holdout
+coverage between 79.6 and 80.9 percent against an 80 percent target
+across all thirteen models, and a production interval with 80.2 percent
+coverage at a median width of 33.3 percent of price.</p></li>
+<li><p>A statistical reading of the leaderboard: with roughly
+3<span>,</span>893 holdout cars, differences below about a quarter of a
+MAPE point are not resolvable, and the paired bootstrap reports which
+rankings the data actually supports.</p></li>
+<li><p>An operable reference system in which every number in this paper
+regenerates from persisted artifacts with one command, and the corpus,
+models and monitoring continue to evolve after publication.</p></li>
+</ol>
+<h1 id="sec:related">Related Work</h1>
+<p>Hedonic price theory models the price of a differentiated good as a
+function of its attributes [1]; used-vehicle valuation is a natural
+instance. Applied studies have compared regression methods for car
+prices, typically on small or scraped datasets: Pudaruth [2] evaluates
+classical learners on a few hundred listings, Monburinon et al. [3]
+compare linear and tree ensembles on a larger German corpus, and Pal et
+al. [4] report random-forest accuracy on the Kaggle used-car corpus.
+These studies rarely control leakage explicitly, rarely test the
+significance of their rankings, and do not report calibrated intervals;
+those omissions motivate the present protocol.</p>
+<p>On tabular learning, the question of whether deep networks beat
+gradient-boosted trees has a substantial recent literature. Entity
+embeddings for categoricals [14] and attention-based feature
+tokenisation [15] are the strongest general-purpose deep tabular
+designs, yet systematic comparisons find well-configured boosting [11,
+12, 13] still ahead on medium-sized heterogeneous tables [16, 17]. Our
+results reproduce this finding on a real commercial task, with both deep
+models implemented natively rather than through wrapper libraries, and
+we quantify the gap with confidence intervals rather than single
+numbers.</p>
+<p>For uncertainty, conformal prediction supplies finite-sample,
+distribution-free coverage guarantees under exchangeability [18, 19,
+21]; conformalised quantile regression [20] adds per-example adaptive
+widths. On methodology, Kaufman et al. [5] catalogue leakage mechanisms,
+Cawley and Talbot [6] analyse selection bias in evaluation, and
+Dietterich [7] argues for statistical tests over point comparisons. On
+the systems side, Sculley et al. [22] describe the operational debt of
+learning systems, and model cards [23] document intended use; both
+practices are implemented in the released system.</p>
+<h1 id="sec:data">Data</h1>
+<p>The corpus contains 38<span>,</span>758 used-vehicle listings from
+the United States market, collected from public marketplaces and dealer
+websites during July and August 2026, spanning dealer and private-party
+sellers, asking prices from $2<span>,</span>000 to $100<span>,</span>000
+and model years 1990 and later. The corpus is proprietary and is not
+distributed; all identity was removed before the data reached this
+project: no vehicle identification numbers, no listing identifiers, no
+seller or platform names, locations reduced to state and three-digit
+postal prefix, and free text scrubbed of telephone numbers, addresses,
+e-mail addresses and URLs.</p>
+<h2 id="curation">Curation</h2>
+<p>Each raw listing record carried roughly 160 fields: site-specific
+presentation fields, duplicated specifications in inconsistent formats,
+sparse single-source columns and seller-entered attributes that
+contradict the vehicle’s build record. Curation reduced this to a
+26-column modelling table through eight documented steps: (i) field
+triage and vocabulary normalisation; (ii) specification enrichment
+through the public government vehicle-decoder API, which overrides
+seller-entered attributes and contributes weight class, series,
+electrification, driver-assistance and plant-of-manufacture fields;
+(iii) removal of placeholder and token prices, including listings that
+advertise a down payment rather than a price, detected from the listing
+wording; (iv) removal of parts vehicles and non-runners by text rules;
+(v) the price-band and model-year gates above with odometer plausibility
+checks; (vi) per-vehicle deduplication across relistings and
+syndication; (vii) a label-noise quarantine that excludes listings
+priced below 0.35 or above 2.5 times a preliminary fair-value fit, so
+typos and misdescribed vehicles cannot poison the target; and (viii)
+audited merges across collection waves. The same gates guard the
+production ingest path (Section 9).</p>
+<h2 id="features-and-target">Features and target</h2>
+<p>The modelling table contains fourteen categoricals (make, model,
+trim, body style, drivetrain, transmission, fuel type, electrification,
+weight class, series, plant country, adaptive cruise, seller type,
+region state), eight numerics (mileage, age, miles per year, doors,
+cylinders, engine power, displacement, original price where shown) and
+the scrubbed description text. All models are trained on <span
+class="math inline">\(y=\log(\text{price})\)</span>: price errors are
+relative by nature, a $500 miss being severe on a cheap car and
+negligible on an expensive one, so log space makes errors comparable
+across the whole price band, and the exponential of a symmetric interval
+in log space yields the asymmetric dollar interval a buyer needs.</p>
+<p>A synthetic generator with the identical schema and plausible price
+physics substitutes for the corpus in the released repository: the test
+suite, the continuous-integration pipeline and any reader run the
+complete study end to end without the private data, with every output
+clearly labelled synthetic.</p>
+<h1 id="sec:protocol">The AppraiseNet Evaluation Protocol</h1>
+<p>Every model is evaluated under one fixed procedure.</p>
+<h3 id="split">Split</h3>
+<p>A 10 percent holdout (3<span>,</span>893 listings) is drawn once with
+a fixed seed and scored exactly once per model; it participates in no
+selection decision. The remaining 34<span>,</span>865 listings form the
+training partition, assigned to five cross-validation folds.</p>
+<h3 id="per-fold-fitting">Per-fold fitting</h3>
+<p>Every fitted statistic is learned inside the fold: categorical
+vocabularies (unseen levels at evaluation time become missing values,
+never new categories), imputation medians, standardisation moments, and
+the one engineered categorical, <em>trim tier</em>, which ranks a trim’s
+median log price within its model line (top, upper, mid, base; groups
+with fewer than four training examples fall back to unknown). Computed
+on the full dataset this feature would leak the target into the inputs;
+the protocol therefore treats it as a model parameter, refitted thirteen
+times per model, once per fold and once for the final fit.</p>
+<h3 id="selection-and-scoring">Selection and scoring</h3>
+<p>Out-of-fold predictions supply the selection metrics and the
+conformal calibration residuals. Each model is then refitted on the full
+training partition and predicts the holdout; only those numbers are
+quoted as performance. Metrics are computed in price space: per-car
+absolute percentage error <span
+class="math inline">\(\mathrm{APE}_i=\lvert\exp(p_i-y_i)-1\rvert\)</span>,
+its mean (MAPE) and median, the share of cars within 10 percent, <span
+class="math inline">\(R^2\)</span> in log space, and interval coverage
+and width.</p>
+<h3 id="equal-conditions">Equal conditions</h3>
+<p>Every model runs with fixed, documented hyper-parameters (Section 5);
+the study compares families under equal conditions rather than tuning
+budgets. One feature-space object serves each family its natural
+encoding of the same information: frozen-level pandas categoricals for
+the boosting libraries, raw category strings for CatBoost, ordinal codes
+with median imputation for the bagged trees, a compact top-40 one-hot
+with standardised numerics for the linear and instance models, and
+integer codes with standardised numerics for the networks.</p>
+<h1 id="sec:models">Models</h1>
+<p>The zoo spans six families; complete hyper-parameters are in the
+repository’s methods document.</p>
+<h3 id="linear-and-instance-baselines">Linear and instance
+baselines</h3>
+<p>Ridge regression (<span class="math inline">\(\alpha=3\)</span>) and
+elastic net (<span class="math inline">\(\alpha=10^{-3}\)</span>, <span
+class="math inline">\(\ell_1\)</span> ratio 0.3) on the one-hot view,
+and a <span class="math inline">\(k\)</span>-nearest-neighbour model
+(<span class="math inline">\(k=15\)</span>, distance weighting) that
+formalises the practitioner’s “find comparable cars” heuristic.</p>
+<h3 id="bagged-trees">Bagged trees</h3>
+<p>RandomForest (300 trees) and ExtraTrees (400 trees), both with
+feature subsampling.</p>
+<h3 id="gradient-boosting">Gradient boosting</h3>
+<p>LightGBM (1<span>,</span>500 rounds, 63 leaves, learning rate 0.03)
+[11], XGBoost (2<span>,</span>000 trees, depth 8, native categorical
+support) [12] and CatBoost (2<span>,</span>500 iterations, depth 8)
+[13].</p>
+<h3 id="deep-tabular">Deep tabular</h3>
+<p>An entity-embedding multilayer perceptron [14] (per-categorical
+embeddings of dimension <span
+class="math inline">\(\min(32,\max(4,\lceil
+1.6\,c^{0.56}\rceil))\)</span> for cardinality <span
+class="math inline">\(c\)</span>, a 256-128 GELU trunk with dropout) and
+a compact FT-Transformer [15] (token dimension 48, three pre-norm
+encoder layers, six heads, a CLS token pooled by a linear head), both
+implemented in PyTorch in roughly 150 lines. Both train with AdamW under
+a cosine schedule, Huber loss, early stopping on a validation slice, and
+a target standardised to z-space, which converges in a handful of epochs
+where raw-target training needs dozens.</p>
+<h3 id="hybrids">Hybrids</h3>
+<p>Three combinations test whether model diversity or extra signal buys
+accuracy. A <em>blend</em> averages LightGBM and CatBoost. A <em>stacked
+ensemble</em> fits a ridge meta-learner on three-fold inner out-of-fold
+predictions of LightGBM, XGBoost and ExtraTrees, so the meta-learner
+never sees a base prediction for a row that base was fitted on. The
+<em>text-residual hybrid</em> fits a TF-IDF ridge (word unigrams and
+bigrams, minimum document frequency 20, at most 20<span>,</span>000
+features) on the inner out-of-fold residuals of a LightGBM base, and at
+inference adds its correction clipped to <span class="math inline">\(\pm
+0.15\)</span> in log space, roughly <span class="math inline">\(\pm
+14\)</span> percent in price: the listing text may nudge a price, never
+invent one.</p>
+<h1 id="sec:uncertainty">Uncertainty Quantification</h1>
+<p>Every model receives a split-conformal interval [18, 19]. With
+out-of-fold absolute residuals <span
+class="math inline">\(r_1,\dots,r_n\)</span> in log space, the widening
+constant is the corrected quantile <span
+class="math inline">\(q=\mathrm{Quantile}\bigl(r,\lceil
+(n{+}1)\,0.8\rceil/n\bigr)\)</span>, and the interval for a holdout car
+with prediction <span class="math inline">\(p\)</span> is <span
+class="math inline">\([\exp(p-q),\,\exp(p+q)]\)</span>; marginal
+80 percent coverage is guaranteed under exchangeability, and Section 8
+verifies it empirically. The production model additionally uses
+conformalised quantile regression [20]: LightGBM quantile models for the
+10th and 90th percentiles, conformity scores <span
+class="math inline">\(s_i=\max(\hat{l}_i-y_i,\,y_i-\hat{u}_i)\)</span>
+on out-of-fold predictions, and both quantiles widened by the corrected
+quantile of <span class="math inline">\(s\)</span>. CQR keeps the
+guarantee while letting the width adapt per car: wide for a rare old
+truck, narrow for a common commuter sedan.</p>
+<h1 id="sec:stats">Statistical Comparison</h1>
+<p>All thirteen models predict the same 3<span>,</span>893 holdout cars,
+so differences are judged on paired errors [7]. A paired bootstrap [8]
+resamples holdout indices 4<span>,</span>000 times, applying the same
+draw to every model, and yields a 95 percent percentile interval for
+each model’s MAPE and for its MAPE gap to the champion. A model whose
+gap interval includes zero is reported as statistically tied with the
+champion; the study never claims a ranking the data cannot support.</p>
+<h1 id="sec:results">Results</h1>
+<figure id="fig:comparison" data-latex-placement="t">
+<img
+src="media/comparison.png"
+style="width:92.0%" />
+<figcaption>Fig. 1. Holdout MAPE of all thirteen models under the
+AppraiseNet Evaluation Protocol, with 95 percent paired-bootstrap
+confidence intervals (error bars) and cross-validation estimates (tick
+marks). Lower is better.</figcaption>
+</figure>
+<table id="tab:results">
+<caption>Table 1. All thirteen models under the AppraiseNet Evaluation
+Protocol. CV is the 5-fold out-of-fold MAPE on the training partition;
+every holdout column is a single scoring pass on the untouched 10 %
+split. The 95 % CI is a paired bootstrap (4<span>,</span>000 resamples
+of the shared holdout). Coverage and width describe the split-conformal
+80 % interval. All values are percentages.</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Model</th>
+<th style="text-align: left;">Family</th>
+<th style="text-align: right;">CV</th>
+<th style="text-align: right;">Holdout</th>
+<th style="text-align: center;">95 % CI</th>
+<th style="text-align: right;">Median</th>
+<th style="text-align: right;"><span
+class="math inline">\(\le\)</span>10 %</th>
+<th style="text-align: right;">Coverage</th>
+<th style="text-align: right;">Width</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">LightGBM + text residual</td>
+<td style="text-align: left;">hybrid</td>
+<td style="text-align: right;">10.91</td>
+<td style="text-align: right;"><strong>10.75</strong></td>
+<td style="text-align: center;">[10.40, 11.12]</td>
+<td style="text-align: right;">7.33</td>
+<td style="text-align: right;">62.4</td>
+<td style="text-align: right;">79.8</td>
+<td style="text-align: right;">33.3</td>
+</tr>
+<tr>
+<td style="text-align: left;">Stacked ensemble</td>
+<td style="text-align: left;">hybrid</td>
+<td style="text-align: right;">11.16</td>
+<td style="text-align: right;"><strong>11.02</strong></td>
+<td style="text-align: center;">[10.65, 11.39]</td>
+<td style="text-align: right;">7.58</td>
+<td style="text-align: right;">61.1</td>
+<td style="text-align: right;">79.7</td>
+<td style="text-align: right;">34.3</td>
+</tr>
+<tr>
+<td style="text-align: left;">LightGBM+CatBoost blend</td>
+<td style="text-align: left;">hybrid</td>
+<td style="text-align: right;">11.14</td>
+<td style="text-align: right;"><strong>11.08</strong></td>
+<td style="text-align: center;">[10.71, 11.45]</td>
+<td style="text-align: right;">7.48</td>
+<td style="text-align: right;">60.6</td>
+<td style="text-align: right;">79.9</td>
+<td style="text-align: right;">34.0</td>
+</tr>
+<tr>
+<td style="text-align: left;">XGBoost</td>
+<td style="text-align: left;">boosting</td>
+<td style="text-align: right;">11.37</td>
+<td style="text-align: right;"><strong>11.19</strong></td>
+<td style="text-align: center;">[10.81, 11.57]</td>
+<td style="text-align: right;">7.59</td>
+<td style="text-align: right;">60.6</td>
+<td style="text-align: right;">79.9</td>
+<td style="text-align: right;">34.8</td>
+</tr>
+<tr>
+<td style="text-align: left;">LightGBM</td>
+<td style="text-align: left;">boosting</td>
+<td style="text-align: right;">11.40</td>
+<td style="text-align: right;"><strong>11.24</strong></td>
+<td style="text-align: center;">[10.88, 11.62]</td>
+<td style="text-align: right;">7.63</td>
+<td style="text-align: right;">60.6</td>
+<td style="text-align: right;">79.6</td>
+<td style="text-align: right;">34.9</td>
+</tr>
+<tr>
+<td style="text-align: left;">CatBoost</td>
+<td style="text-align: left;">boosting</td>
+<td style="text-align: right;">11.58</td>
+<td style="text-align: right;"><strong>11.58</strong></td>
+<td style="text-align: center;">[11.19, 11.98]</td>
+<td style="text-align: right;">8.05</td>
+<td style="text-align: right;">58.2</td>
+<td style="text-align: right;">80.0</td>
+<td style="text-align: right;">35.5</td>
+</tr>
+<tr>
+<td style="text-align: left;">Embedding MLP</td>
+<td style="text-align: left;">deep tabular</td>
+<td style="text-align: right;">12.19</td>
+<td style="text-align: right;"><strong>11.94</strong></td>
+<td style="text-align: center;">[11.55, 12.34]</td>
+<td style="text-align: right;">8.44</td>
+<td style="text-align: right;">56.7</td>
+<td style="text-align: right;">79.9</td>
+<td style="text-align: right;">37.2</td>
+</tr>
+<tr>
+<td style="text-align: left;">FT-Transformer</td>
+<td style="text-align: left;">deep tabular</td>
+<td style="text-align: right;">12.76</td>
+<td style="text-align: right;"><strong>12.36</strong></td>
+<td style="text-align: center;">[11.95, 12.76]</td>
+<td style="text-align: right;">8.90</td>
+<td style="text-align: right;">54.7</td>
+<td style="text-align: right;">80.9</td>
+<td style="text-align: right;">39.9</td>
+</tr>
+<tr>
+<td style="text-align: left;">ExtraTrees</td>
+<td style="text-align: left;">bagged trees</td>
+<td style="text-align: right;">13.11</td>
+<td style="text-align: right;"><strong>12.88</strong></td>
+<td style="text-align: center;">[12.44, 13.32]</td>
+<td style="text-align: right;">8.54</td>
+<td style="text-align: right;">55.6</td>
+<td style="text-align: right;">79.9</td>
+<td style="text-align: right;">39.9</td>
+</tr>
+<tr>
+<td style="text-align: left;">RandomForest</td>
+<td style="text-align: left;">bagged trees</td>
+<td style="text-align: right;">13.73</td>
+<td style="text-align: right;"><strong>13.49</strong></td>
+<td style="text-align: center;">[13.03, 13.97]</td>
+<td style="text-align: right;">9.24</td>
+<td style="text-align: right;">53.0</td>
+<td style="text-align: right;">80.1</td>
+<td style="text-align: right;">41.9</td>
+</tr>
+<tr>
+<td style="text-align: left;"><span class="math inline">\(k\)</span>-NN
+comparables</td>
+<td style="text-align: left;">instance</td>
+<td style="text-align: right;">15.54</td>
+<td style="text-align: right;"><strong>15.22</strong></td>
+<td style="text-align: center;">[14.74, 15.71]</td>
+<td style="text-align: right;">10.79</td>
+<td style="text-align: right;">47.0</td>
+<td style="text-align: right;">80.5</td>
+<td style="text-align: right;">47.9</td>
+</tr>
+<tr>
+<td style="text-align: left;">Ridge</td>
+<td style="text-align: left;">linear</td>
+<td style="text-align: right;">18.90</td>
+<td style="text-align: right;"><strong>18.93</strong></td>
+<td style="text-align: center;">[18.34, 19.53]</td>
+<td style="text-align: right;">14.18</td>
+<td style="text-align: right;">37.7</td>
+<td style="text-align: right;">80.1</td>
+<td style="text-align: right;">58.7</td>
+</tr>
+<tr>
+<td style="text-align: left;">Elastic net</td>
+<td style="text-align: left;">linear</td>
+<td style="text-align: right;">19.32</td>
+<td style="text-align: right;"><strong>19.42</strong></td>
+<td style="text-align: center;">[18.79, 20.04]</td>
+<td style="text-align: right;">14.43</td>
+<td style="text-align: right;">36.5</td>
+<td style="text-align: right;">79.8</td>
+<td style="text-align: right;">60.2</td>
+</tr>
+</tbody>
+</table>
+<p>Table 1 and Fig. 1 give the complete picture; four findings stand
+out.</p>
+<h3 id="listing-text-carries-real-pricing-signal">Listing text carries
+real pricing signal</h3>
+<p>The champion is the text-residual hybrid at 10.75 percent holdout
+MAPE (95 percent CI 10.40 to 11.12), a median absolute error of
+7.33 percent and 62.4 percent of cars priced within 10 percent of the
+asking price. Its 0.49-point improvement over its own LightGBM base is
+statistically significant, and it beats the stacked ensemble
+(11.02 percent) whose gap interval, 0.15 to 0.38 points, excludes zero.
+The bounded correction design matters for trust: because the text stage
+is fitted on inner out-of-fold residuals and clipped in log space,
+marketing language can adjust a valuation by at most about 14 percent
+and cannot fabricate one.</p>
+<h3
+id="boosting-dominates-the-single-model-field-and-the-deep-models-land-behind-it">Boosting
+dominates the single-model field, and the deep models land behind
+it</h3>
+<p>The three boosting libraries score 11.19 to 11.58 percent,
+statistically indistinguishable between LightGBM and XGBoost. The
+entity-embedding MLP (11.94 percent) and the FT-Transformer
+(12.36 percent) are competitive but significantly behind boosting,
+reproducing the pattern reported in controlled tabular comparisons [16,
+17] on a real commercial task. The instance-based comparables model
+(15.22 percent) and the linear models (up to 19.42 percent) trail far
+behind: interactions among make, model, trim, age and mileage are the
+heart of the problem.</p>
+<h3 id="coverage-holds-for-every-model">Coverage holds for every
+model</h3>
+<p>Empirical holdout coverage of the split-conformal intervals lies
+between 79.6 and 80.9 percent for all thirteen models against the
+80 percent target: the guarantee is not decorative. What differs is
+width, from 33.3 percent of price for the champion to roughly 60 percent
+for the linear models: a second, decision-relevant axis of model quality
+that MAPE alone does not expose. The production CQR interval attains
+80.2 percent coverage at a median width of 33.3 percent of price, with
+per-car adaptivity.</p>
+<h3 id="the-leaderboard-has-a-resolution-limit">The leaderboard has a
+resolution limit</h3>
+<p>With 3<span>,</span>893 holdout cars, MAPE differences below roughly
+a quarter of a point are inside the paired-bootstrap noise. The top of
+Table 1 should therefore be read as one significant champion followed by
+a closely ordered group, not as thirteen settled ranks.</p>
+<table id="tab:segments">
+<caption>Table 2. Holdout MAPE (%) by segment for the five strongest
+models. The hard segments are shared: cheap, old, high-mileage and
+private-party cars.</caption>
+<thead>
+<tr>
+<th style="text-align: left;">Segment</th>
+<th style="text-align: right;"><span
+class="math inline">\(n\)</span></th>
+<th style="text-align: right;">Text hybrid</th>
+<th style="text-align: right;">Stack</th>
+<th style="text-align: right;">Blend</th>
+<th style="text-align: right;">XGBoost</th>
+<th style="text-align: right;">LightGBM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">under $10k</td>
+<td style="text-align: right;">668</td>
+<td style="text-align: right;">18.1</td>
+<td style="text-align: right;">18.6</td>
+<td style="text-align: right;">18.5</td>
+<td style="text-align: right;">19.3</td>
+<td style="text-align: right;">19.0</td>
+</tr>
+<tr>
+<td style="text-align: left;">$10k-20k</td>
+<td style="text-align: right;">1,384</td>
+<td style="text-align: right;">10.6</td>
+<td style="text-align: right;">11.2</td>
+<td style="text-align: right;">11.1</td>
+<td style="text-align: right;">11.3</td>
+<td style="text-align: right;">11.2</td>
+</tr>
+<tr>
+<td style="text-align: left;">$20k-40k</td>
+<td style="text-align: right;">1,447</td>
+<td style="text-align: right;">8.0</td>
+<td style="text-align: right;">8.1</td>
+<td style="text-align: right;">8.2</td>
+<td style="text-align: right;">8.1</td>
+<td style="text-align: right;">8.3</td>
+</tr>
+<tr>
+<td style="text-align: left;">over $40k</td>
+<td style="text-align: right;">399</td>
+<td style="text-align: right;">8.9</td>
+<td style="text-align: right;">8.5</td>
+<td style="text-align: right;">9.1</td>
+<td style="text-align: right;">8.6</td>
+<td style="text-align: right;">9.0</td>
+</tr>
+<tr>
+<td style="text-align: left;">age 0-3y</td>
+<td style="text-align: right;">1,062</td>
+<td style="text-align: right;">7.0</td>
+<td style="text-align: right;">7.0</td>
+<td style="text-align: right;">7.3</td>
+<td style="text-align: right;">6.8</td>
+<td style="text-align: right;">7.2</td>
+</tr>
+<tr>
+<td style="text-align: left;">age 4-10y</td>
+<td style="text-align: right;">1,841</td>
+<td style="text-align: right;">9.8</td>
+<td style="text-align: right;">10.3</td>
+<td style="text-align: right;">10.4</td>
+<td style="text-align: right;">10.5</td>
+<td style="text-align: right;">10.5</td>
+</tr>
+<tr>
+<td style="text-align: left;">age 11y+</td>
+<td style="text-align: right;">990</td>
+<td style="text-align: right;">16.4</td>
+<td style="text-align: right;">16.6</td>
+<td style="text-align: right;">16.4</td>
+<td style="text-align: right;">17.2</td>
+<td style="text-align: right;">17.0</td>
+</tr>
+<tr>
+<td style="text-align: left;">150k+ miles</td>
+<td style="text-align: right;">256</td>
+<td style="text-align: right;">16.8</td>
+<td style="text-align: right;">16.8</td>
+<td style="text-align: right;">16.2</td>
+<td style="text-align: right;">17.6</td>
+<td style="text-align: right;">17.0</td>
+</tr>
+<tr>
+<td style="text-align: left;">private seller</td>
+<td style="text-align: right;">197</td>
+<td style="text-align: right;">21.0</td>
+<td style="text-align: right;">20.3</td>
+<td style="text-align: right;">19.9</td>
+<td style="text-align: right;">20.3</td>
+<td style="text-align: right;">20.9</td>
+</tr>
+</tbody>
+</table>
+<figure id="fig:calibration" data-latex-placement="t">
+<img
+src="media/calibration.png" />
+<figcaption>Fig. 2. Champion calibration by predicted-price decile on
+the holdout. Points on the diagonal indicate that predicted and realised
+prices agree in every decile; the only visible deviation is mild
+overprediction in the cheapest decile.</figcaption>
+</figure>
+<figure id="fig:ecdf" data-latex-placement="t">
+<img
+src="media/error_ecdf.png" />
+<figcaption>Fig. 3. Distribution of absolute percentage errors on the
+holdout for the four strongest models.</figcaption>
+</figure>
+<h3 id="where-pricing-is-hard">Where pricing is hard</h3>
+<p>Table 2 slices the holdout along the axes where valuation models
+usually hide their weaknesses. The pattern is shared by every strong
+model: recent cars in the middle of the price band are easy (MAPE near 7
+to 8 percent), while cars under $10<span>,</span>000, cars older than
+ten years, cars beyond 150<span>,</span>000 miles and private-party
+sales are hard (16 to 21 percent). These segments are exactly where
+condition, maintenance history and seller behaviour, which listings
+describe only partially, dominate the price. Fig. 2 shows that the
+champion is nevertheless calibrated across the predicted-price range,
+and Fig. 3 shows the error distributions of the strongest models.</p>
+<h1 id="sec:production">The Production System</h1>
+<p>The study is operated, not archived. Storage is one URL that accepts
+an embedded database file or a PostgreSQL connection string; every
+reader and writer in the package goes through the same layer. New
+listings enter through an idempotent ingest command: rows pass the same
+quality gates as training, are fingerprinted on their identifying
+fields, and only never-seen listings are appended, with every run
+audited, so a daily job can never duplicate or dirty the corpus. A
+retraining command fits the production configuration and promotes it
+only if its holdout MAPE is within 0.3 points of the serving model,
+otherwise the previous version keeps serving; versions are semantic and
+archived for rollback. The serving API returns the point price with its
+calibrated interval, hot-reloads on promotion and logs every prediction;
+a drift monitor compares recent traffic against the training reference
+with population-stability indices and warn and alert thresholds.</p>
+<p>One deployment decision deserves note: production serves the best
+<em>text-free</em> configuration (LightGBM with CQR) rather than the
+study champion, because the prediction API receives a structured
+specification without a listing description. The deployed model is
+selected for the inputs it will actually see; the text hybrid remains
+the reference result for description-bearing surfaces.</p>
+<h1 id="sec:limitations">Limitations</h1>
+<p>The target is the asking price, not the transaction price; the model
+estimates what comparable cars are listed for, and dealer negotiation
+margins are outside the data. The corpus covers the United States market
+in one collection window, capped at $100<span>,</span>000 and model year
+1990 or later; collector and exotic vehicles are out of scope by design.
+The protocol uses a single fixed holdout with bootstrap uncertainty
+rather than repeated re-splits, a deliberate trade against the
+multi-hour cost of the full study; the cross-validation column of Table
+1 provides the complementary resampling view, and the two agree closely
+for every model. Hyper-parameters are fixed per family rather than tuned
+per model, so the comparison bounds each family’s performance under
+sensible defaults rather than its ceiling. Vehicle condition and
+accident history are observed only through the listing text, which
+Section 8 shows is precisely where the remaining error concentrates.</p>
+<h1 id="sec:conclusion">Conclusion</h1>
+<p>Under a protocol that removes leakage by construction, attaches
+calibrated uncertainty to every model and tests every claimed
+difference, used-vehicle price estimation on curated listings resolves
+clearly: gradient boosting is the strongest single-model family, deep
+tabular architectures land measurably behind it, and the best result
+comes from letting the listing text correct a boosted base within safe
+bounds, reaching 10.75 percent MAPE with 80 percent intervals whose
+coverage holds empirically. The released system keeps the study alive:
+the corpus grows through gated daily ingest, retraining is guarded by
+promotion rules, and every number in this paper regenerates from
+persisted artifacts with one command. Future work targets the hard
+segments with explicit condition modelling, transaction-price
+supervision where obtainable, and pretrained language representations
+for the text stage.</p>
+<h1 class="unnumbered" id="references">References</h1>
+<ol>
+<li><p>S. Rosen, “Hedonic prices and implicit markets: Product
+differentiation in pure competition,” <em>Journal of Political
+Economy</em>, vol. 82, no. 1, pp. 34 to 55, 1974.</p></li>
+<li><p>S. Pudaruth, “Predicting the price of used cars using machine
+learning techniques,” <em>International Journal of Information and
+Computation Technology</em>, vol. 4, no. 7, pp. 753 to 764,
+2014.</p></li>
+<li><p>N. Monburinon, P. Chertchom, T. Kaewkiriya, S. Rungpheung, S.
+Buya, and P. Boonpou, “Prediction of prices for used car by using
+regression models,” in <em>Proc. ICBIR</em>, 2018, pp. 115 to
+119.</p></li>
+<li><p>N. Pal, P. Arora, P. Kohli, D. Sundararaman, and S. S.
+Palakurthy, “How much is my car worth? A methodology for predicting used
+cars’ prices using random forest,” in <em>Advances in Information and
+Communication Networks</em>, Springer, 2019, pp. 413 to 422.</p></li>
+<li><p>S. Kaufman, S. Rosset, C. Perlich, and O. Stitelman, “Leakage in
+data mining: Formulation, detection, and avoidance,” <em>ACM TKDD</em>,
+vol. 6, no. 4, 2012.</p></li>
+<li><p>G. C. Cawley and N. L. C. Talbot, “On over-fitting in model
+selection and subsequent selection bias in performance evaluation,”
+<em>JMLR</em>, vol. 11, pp. 2079 to 2107, 2010.</p></li>
+<li><p>T. G. Dietterich, “Approximate statistical tests for comparing
+supervised classification learning algorithms,” <em>Neural
+Computation</em>, vol. 10, no. 7, pp. 1895 to 1923, 1998.</p></li>
+<li><p>B. Efron, “Bootstrap methods: Another look at the jackknife,”
+<em>The Annals of Statistics</em>, vol. 7, no. 1, pp. 1 to 26,
+1979.</p></li>
+<li><p>L. Breiman, “Random forests,” <em>Machine Learning</em>, vol. 45,
+no. 1, pp. 5 to 32, 2001.</p></li>
+<li><p>P. Geurts, D. Ernst, and L. Wehenkel, “Extremely randomized
+trees,” <em>Machine Learning</em>, vol. 63, no. 1, pp. 3 to 42,
+2006.</p></li>
+<li><p>G. Ke, Q. Meng, T. Finley, T. Wang, W. Chen, W. Ma, Q. Ye, and
+T.-Y. Liu, “LightGBM: A highly efficient gradient boosting decision
+tree,” in <em>Proc. NeurIPS</em>, 2017.</p></li>
+<li><p>T. Chen and C. Guestrin, “XGBoost: A scalable tree boosting
+system,” in <em>Proc. KDD</em>, 2016, pp. 785 to 794.</p></li>
+<li><p>L. Prokhorenkova, G. Gusev, A. Vorobev, A. V. Dorogush, and A.
+Gulin, “CatBoost: Unbiased boosting with categorical features,” in
+<em>Proc. NeurIPS</em>, 2018.</p></li>
+<li><p>C. Guo and F. Berkhahn, “Entity embeddings of categorical
+variables,” <em>arXiv:1604.06737</em>, 2016.</p></li>
+<li><p>Y. Gorishniy, I. Rubachev, V. Khrulkov, and A. Babenko,
+“Revisiting deep learning models for tabular data,” in <em>Proc.
+NeurIPS</em>, 2021.</p></li>
+<li><p>R. Shwartz-Ziv and A. Armon, “Tabular data: Deep learning is not
+all you need,” <em>Information Fusion</em>, vol. 81, pp. 84 to 90,
+2022.</p></li>
+<li><p>L. Grinsztajn, E. Oyallon, and G. Varoquaux, “Why do tree-based
+models still outperform deep learning on typical tabular data?” in
+<em>Proc. NeurIPS Datasets and Benchmarks</em>, 2022.</p></li>
+<li><p>V. Vovk, A. Gammerman, and G. Shafer, <em>Algorithmic Learning in
+a Random World</em>. Springer, 2005.</p></li>
+<li><p>J. Lei, M. G’Sell, A. Rinaldo, R. J. Tibshirani, and L.
+Wasserman, “Distribution-free predictive inference for regression,”
+<em>JASA</em>, vol. 113, no. 523, pp. 1094 to 1111, 2018.</p></li>
+<li><p>Y. Romano, E. Patterson, and E. Candès, “Conformalized quantile
+regression,” in <em>Proc. NeurIPS</em>, 2019.</p></li>
+<li><p>A. N. Angelopoulos and S. Bates, “Conformal prediction: A gentle
+introduction,” <em>Foundations and Trends in Machine Learning</em>, vol.
+16, no. 4, pp. 494 to 591, 2023.</p></li>
+<li><p>D. Sculley, G. Holt, D. Golovin, E. Davydov, T. Phillips, D.
+Ebner, V. Chaudhary, M. Young, J.-F. Crespo, and D. Dennison, “Hidden
+technical debt in machine learning systems,” in <em>Proc. NeurIPS</em>,
+2015.</p></li>
+<li><p>M. Mitchell, S. Wu, A. Zaldivar, P. Barnes, L. Vasserman, B.
+Hutchinson, E. Spitzer, I. D. Raji, and T. Gebru, “Model cards for model
+reporting,” in <em>Proc. FAT*</em>, 2019, pp. 220 to 229.</p></li>
+</ol>
+</body>
+</html>

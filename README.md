@@ -8,6 +8,9 @@ under the AppraiseNet Evaluation Protocol, wrapped in a production learning loop
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+**Project page:** [rhs2.github.io/appraisenet](https://rhs2.github.io/appraisenet/) ·
+**Paper:** [PDF](docs/Sium_Finstuen_2026_AppraiseNet.pdf) / [read online](https://rhs2.github.io/appraisenet/paper.html)
+
 AppraiseNet asks a question every applied pricing team faces: *given ~39,000 real used-car
 listings, which learning approach actually prices cars best, and how honest can its
 uncertainty be?* It answers with a controlled comparison of six model families under the
@@ -163,7 +166,8 @@ pytest -q                                   # everything runs on synthetic data
 configs/            experiment configurations (default, smoke)
 src/appraisenet/    data, db, features, protocol, model zoo (models/), benchmark,
                     compare, evaluate, registry, serve, monitor, tracking, cli
-docs/               METHODS.md (full methodology) + committed result figures
+docs/               METHODS.md, the GitHub Pages site (index, paper, PDF), result figures
+paper/              IEEEtran manuscript: main.tex + generated tables; python paper/build.py
 data/               schema + curation documentation (the corpus itself is never here)
 models/             production registry (populated by train-production, never committed)
 tests/              pytest suite (synthetic corpus only)
@@ -175,12 +179,13 @@ deploy/aws/         Terraform (ECR, ECS Fargate, ALB, RDS, S3) + deployment note
 ## Citation
 
 ```bibtex
-@software{sium2026appraisenet,
-  author = {Sium, Rakibul Hasan},
-  title  = {AppraiseNet: Calibrated Used-Vehicle Price Estimation with Classical,
-            Deep and Hybrid Learners},
-  year   = {2026},
-  url    = {https://github.com/rhs2/appraisenet}
+@misc{sium2026appraisenet,
+  author       = {Sium, Rakibul Hasan and Finstuen, Drew},
+  title        = {AppraiseNet: Calibrated Used-Vehicle Price Estimation with
+                  Classical, Deep and Hybrid Learners},
+  year         = {2026},
+  howpublished = {Paper, project page and source code},
+  url          = {https://rhs2.github.io/appraisenet/}
 }
 ```
 
