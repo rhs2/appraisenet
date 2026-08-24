@@ -48,7 +48,7 @@ def _comparison(res: pd.DataFrame, fig_dir: Path) -> Path:
         if st["mape_ci95_low"].notna().all():
             xerr = np.vstack([(st["holdout_mape_pct"] - st["mape_ci95_low"]).values,
                               (st["mape_ci95_high"] - st["holdout_mape_pct"]).values])
-            tied = set(st.index[st["tied_with_champion"].fillna(False)])
+            tied = set(st.index[st["tied_with_champion"].fillna(False)]) - {res.iloc[0]["model"]}
     fig, ax = plt.subplots(figsize=(8.8, 0.42 * len(r) + 1.2))
     colours = [FAMILY_COLOURS.get(f, "#999999") for f in r["family"]]
     ax.barh(r["model"], r["holdout_mape_pct"], color=colours, height=0.62,

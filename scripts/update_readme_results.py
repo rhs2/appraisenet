@@ -37,11 +37,18 @@ def main() -> None:
                      f"{r['holdout_median_ape_pct']}% | {r['holdout_within_10_pct']}% | "
                      f"{r['holdout_coverage_pct']}% | {r['holdout_width_pct_of_price']}% |")
     if stats is not None:
-        lines += ["", "† statistically tied with the champion: the 95% paired-bootstrap interval of the "
-                      "MAPE gap (4,000 resamples of the shared holdout) includes zero."]
+        tied_others = [m for m in stats.index
+                       if bool(stats.loc[m, "tied_with_champion"]) and m != top["model"]]
+        if tied_others:
+            lines += ["", "† statistically tied with the champion: the 95% paired-bootstrap interval of "
+                          "the MAPE gap (4,000 resamples of the shared holdout) includes zero."]
+        else:
+            lines += ["", "The champion's lead is statistically significant: no other model's 95% "
+                          "paired-bootstrap MAPE-gap interval includes zero."]
     if "cqr" in meta:
         c = meta["cqr"]
-        lines += ["", f"Production interval (CQR on the champion): **{c['cqr_holdout_coverage_pct']}% coverage** "
+        lines += ["", f"Production interval (conformalised quantile regression on the production "
+                      f"configuration): **{c['cqr_holdout_coverage_pct']}% coverage** "
                       f"at a median width of {c['cqr_holdout_width_pct_of_price']}% of price."]
     lines += ["", "**Holdout MAPE by segment (top models):**", ""]
     cols = [c for c in seg.columns if c not in ("segment", "n")]

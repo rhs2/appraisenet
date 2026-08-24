@@ -152,10 +152,13 @@ prediction arrays without refitting.
   training, are fingerprinted on identifying fields, and only never-seen rows are
   appended (idempotent; audited in `ingest_log`). Storage is SQLite or PostgreSQL
   behind one URL.
-- **Registry** (`appraisenet train-production`): fits the champion configuration plus
+- **Registry** (`appraisenet train-production`): fits the production configuration plus
   CQR, then promotes only if holdout MAPE is within 0.30 points of the serving model;
   otherwise the candidate is archived and the old version keeps serving. Semantic
-  versions, automatic minor bumps, previous versions kept for rollback.
+  versions, automatic minor bumps, previous versions kept for rollback. The production
+  configuration is the best text-free model (LightGBM plus CQR) rather than the study's
+  overall champion: the prediction API receives structured fields without a listing
+  description, so the deployed model is selected for the inputs it will actually see.
 - **Serving** (`appraisenet serve`): FastAPI, point price + calibrated interval,
   hot-reload on promotion, every prediction logged.
 - **Drift** (`appraisenet monitor`): population-stability index between the training
