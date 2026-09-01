@@ -112,12 +112,13 @@ def cqr_champion(split: Split, cfg: Config) -> dict[str, float]:
 
 def segment_table(hold: pd.DataFrame, preds: dict[str, np.ndarray]) -> pd.DataFrame:
     """Holdout error by the slices where pricing models usually hide their weaknesses."""
+    from .compare import BANDS
+
     yh = hold[TARGET].values
-    segs = {
-        "under $10k": hold["price"] < 10_000,
-        "$10k-20k": hold["price"].between(10_000, 20_000),
-        "$20k-40k": hold["price"].between(20_000, 40_000),
-        "over $40k": hold["price"] > 40_000,
+    # half-open bands from one definition, shared with the price-band report: an
+    # inclusive `between` on both ends counts a car priced at exactly $20,000 twice
+    segs = {label: (hold["price"] >= lo) & (hold["price"] < hi) for lo, hi, label in BANDS}
+    segs |= {
         "age 0-3y": hold["age"] <= 3,
         "age 4-10y": hold["age"].between(4, 10),
         "age 11y+": hold["age"] >= 11,

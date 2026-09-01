@@ -55,14 +55,21 @@ def main(argv: list[str] | None = None) -> int:
         run_benchmark(load_config(a.config, over))
         return 0
     if a.cmd == "report":
-        from .compare import comparison_stats
+        from .compare import comparison_stats, error_profiles
         from .config import load_config
         from .evaluate import make_figures
         out = load_config(None).out_dir
         stats = comparison_stats(out)
         if stats is not None:
             tied = stats.loc[stats["tied_with_champion"], "model"].tolist()
-            print("paired bootstrap, statistically tied for best:", ", ".join(tied))
+            print("paired bootstrap, statistically tied on MAPE:", ", ".join(tied))
+            if "tied_with_best_median" in stats.columns:
+                tied_med = stats.loc[stats["tied_with_best_median"], "model"].tolist()
+                print("paired bootstrap, statistically tied on median APE:", ", ".join(tied_med))
+        profile, bands = error_profiles(out)
+        for name, frame in (("error_profile.csv", profile), ("price_bands.csv", bands)):
+            if frame is not None:
+                print(f"wrote {name} ({len(frame)} rows)")
         for p in make_figures(out):
             print("figure:", p)
         return 0
