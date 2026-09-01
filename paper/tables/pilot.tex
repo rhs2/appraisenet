@@ -1,0 +1,25 @@
+\begin{table*}[t]
+\centering
+\caption{The pilot tier: the full 13-model zoo on the 38{,}758-listing corpus snapshot of August 2026, same protocol, same columns as Table~\ref{tab:results}.}
+\label{tab:pilot}
+\footnotesize\setlength{\tabcolsep}{5pt}
+\begin{tabular}{llrrcrrrrr}
+\toprule
+Model & Family & CV & Holdout & 95\,\% CI & Median & $\le$10\,\% & Coverage & Width & Fit (min) \\
+\midrule
+LightGBM + text residual & hybrid & 10.91 & \textbf{10.75} & [10.40, 11.12] & 7.33 & 62.4 & 79.8 & 33.3 & 5.5 \\
+Stacked ensemble & hybrid & 11.16 & \textbf{11.02} & [10.65, 11.39] & 7.58 & 61.1 & 79.7 & 34.3 & 14 \\
+LightGBM+CatBoost blend & hybrid & 11.14 & \textbf{11.08} & [10.71, 11.45] & 7.48 & 60.6 & 79.9 & 34.0 & 7.9 \\
+XGBoost & boosting & 11.37 & \textbf{11.19} & [10.81, 11.57] & 7.59 & 60.6 & 79.9 & 34.8 & 2.1 \\
+LightGBM & boosting & 11.40 & \textbf{11.24} & [10.88, 11.62] & 7.63 & 60.6 & 79.6 & 34.9 & 1.7 \\
+CatBoost & boosting & 11.58 & \textbf{11.58} & [11.19, 11.98] & 8.05 & 58.2 & 80.0 & 35.5 & 6.1 \\
+Embedding MLP & deep tabular & 12.19 & \textbf{11.94} & [11.55, 12.34] & 8.44 & 56.7 & 79.9 & 37.2 & 0.7 \\
+FT-Transformer & deep tabular & 12.76 & \textbf{12.36} & [11.95, 12.76] & 8.90 & 54.7 & 80.9 & 39.9 & 13 \\
+ExtraTrees & bagged trees & 13.11 & \textbf{12.88} & [12.44, 13.32] & 8.54 & 55.6 & 79.9 & 39.9 & 0.3 \\
+RandomForest & bagged trees & 13.73 & \textbf{13.49} & [13.03, 13.97] & 9.24 & 53.0 & 80.1 & 41.9 & 0.4 \\
+$k$-NN comparables & instance & 15.54 & \textbf{15.22} & [14.74, 15.71] & 10.79 & 47.0 & 80.5 & 47.9 & 0.1 \\
+Ridge & linear & 18.90 & \textbf{18.93} & [18.34, 19.53] & 14.18 & 37.7 & 80.1 & 58.7 & 0.1 \\
+Elastic net & linear & 19.32 & \textbf{19.42} & [18.79, 20.04] & 14.43 & 36.5 & 79.8 & 60.2 & 0.1 \\
+\bottomrule
+\end{tabular}
+\end{table*}

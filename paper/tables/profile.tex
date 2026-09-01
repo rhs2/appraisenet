@@ -1,0 +1,22 @@
+\begin{table*}[t]
+\centering
+\caption{The error distribution behind the leaderboard, ordered by MAPE. The median describes the typical car and the mean describes the tail; the anchored residual engines hold the best medians and the worst means, because 5\,\% of their errors carry 33\,\% of their total error. The median CI is the same paired bootstrap as Table~\ref{tab:results}. All values are percentages except the last column, which is the share of summed absolute percentage error contributed by cars missed by more than 25\,\%.}
+\label{tab:profile}
+\footnotesize\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrcrrrrrr}
+\toprule
+Model & Median & 95\,\% CI & MAPE & $\le$5\,\% & p90 & p99 & $>$50\,\% & Tail share \\
+\midrule
+LightGBM+CatBoost blend & 4.72 & [4.69, 4.76] & 7.26 & 52.2 & 15.4 & 43.4 & 0.73 & 21.5 \\
+Anchored LightGBM & 4.75 & [4.72, 4.79] & 7.31 & 51.9 & 15.5 & 43.3 & 0.75 & 21.9 \\
+LightGBM + text residual & 4.75 & [4.72, 4.78] & 7.32 & 52.0 & 15.5 & 43.6 & 0.73 & 21.8 \\
+XGBoost & 4.79 & [4.75, 4.82] & 7.33 & 51.8 & 15.5 & 44.2 & 0.75 & 22.0 \\
+LightGBM & 4.76 & [4.73, 4.80] & 7.34 & 51.9 & 15.6 & 43.8 & 0.73 & 21.9 \\
+Embedding MLP & 4.86 & [4.82, 4.89] & 7.45 & 51.1 & 15.8 & 44.4 & 0.75 & 22.2 \\
+CatBoost & 4.97 & [4.93, 5.01] & 7.52 & 50.2 & 15.9 & 44.3 & 0.74 & 21.6 \\
+FT-Transformer & 5.25 & [5.21, 5.29] & 7.78 & 48.1 & 16.4 & 43.5 & 0.70 & 21.5 \\
+Anchored blend (two engines) & 4.68 & [4.65, 4.72] & 8.24 & 52.5 & 16.1 & 67.8 & 1.56 & 32.9 \\
+Anchored hybrid (residual) & 4.72 & [4.69, 4.76] & 8.32 & 52.2 & 16.4 & 68.6 & 1.57 & 33.2 \\
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -1,0 +1,16 @@
+\begin{table*}[t]
+\centering
+\caption{Holdout MAPE (\%) by price band. The anchored residual engines are the most accurate models in the two upper bands and the least accurate by far in the cheapest one, which holds only 6.6\,\% of the holdout yet decides the corpus mean.}
+\label{tab:bands}
+\footnotesize\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+Band & $n$ & Blend & Anch.\ LGBM & Anch.\ blend & Anch.\ hybrid & FT-Trans. \\
+\midrule
+under \$10k & 7,778 & 20.79 & 20.91 & 33.86 & 34.13 & 20.29 \\
+\$10k-20k & 24,894 & 9.26 & 9.37 & 10.03 & 10.21 & 9.65 \\
+\$20k-40k & 60,069 & 5.48 & 5.51 & 5.40 & 5.45 & 6.07 \\
+over \$40k & 24,519 & 5.31 & 5.32 & 5.24 & 5.27 & 6.08 \\
+\bottomrule
+\end{tabular}
+\end{table*}
