@@ -24,14 +24,25 @@ Metrics, computed in price space from log-space predictions p and targets y:
 
 ## 2. Data
 
-38,758 US used-vehicle listings (July-August 2026, dealer and private-party sellers),
-asking prices in $2,000-$100,000, model year 1990+. The corpus is proprietary and not
-distributed; identity was stripped before it reached this project. Curation reduced
-roughly 160 raw fields per listing to 26 modeling columns through field triage,
-VIN-decode enrichment (NHTSA vPIC), junk-price and not-a-car removal, per-vehicle
-deduplication and a label-noise quarantine; `data/README.md` documents every step.
-A synthetic generator with the identical schema and plausible price physics stands in
-for the corpus in tests and CI.
+1,174,659 US used-vehicle listings (collected July-August 2026, dealer and
+private-party sellers, growing daily through the ingest path), asking prices in
+$2,000-$100,000, model year 1990+. The corpus is proprietary and not distributed;
+identity was stripped before it reached this project. Curation reduced roughly 160 raw
+fields per listing to 29 modeling columns through field triage, VIN-decode enrichment
+(NHTSA vPIC), junk-price and not-a-car removal, per-vehicle deduplication and a
+label-noise quarantine; `data/README.md` documents every step, including the deliberate
+exclusion of the listing's first asking price and derived price-drop fields, which
+would let a model read the label rather than price the car. A synthetic generator with
+the identical schema and plausible price physics stands in for the corpus in tests and
+CI.
+
+The study's first edition (the **pilot**) ran the entire 13-model zoo on the
+38,758-listing corpus snapshot of late August 2026; its committed evidence lives in
+`reports/pilot/`. The corpus-scale edition runs every model that can ride the full
+corpus on a single machine (`configs/default.yaml`); the classical baselines whose
+memory or distance computations grow quadratically at this scale (linear one-hot,
+k-NN, unbounded-depth bagged trees) remain represented by their pilot-tier results
+(`configs/pilot.yaml` reproduces that tier).
 
 Engineered per row before splitting: `age = current_year - year` (clipped at 0) and
 `miles_per_year = mileage / max(age, 1)`. The target `log_price` is set after the
@@ -72,7 +83,7 @@ information in its natural encoding:
 Categoricals: make, model, trim, body_style, drivetrain, transmission, fuel_type,
 electrification, gvwr_class, series, plant_country, adaptive_cruise, seller_type,
 region_state, trim_tier. Numerics: mileage, age, miles_per_year, doors, cylinders,
-engine_hp, displacement_l, original_price.
+engine_hp, displacement_l, original_price, msrp, days_listed, price_changes.
 
 ## 5. Models and exact hyper-parameters
 
@@ -91,6 +102,9 @@ engine_hp, displacement_l, original_price.
 | blend | arithmetic mean of LightGBM and CatBoost predictions |
 | text hybrid | Section 5.2 |
 | stack | Section 5.3 |
+| anchored LightGBM | Section 5.4 |
+| anchored hybrid | Section 5.5 |
+| anchored blend | Section 5.6 |
 
 ### 5.1 Deep models: training recipe
 
@@ -121,6 +135,64 @@ columns only. For evaluation, the bases are refitted on the full training partit
 the meta-learner combines their predictions. The meta-learner never trains on
 predictions a base made for rows it was fitted on.
 
+### 5.4 Anchored LightGBM
+
+The configuration deployed pricing systems actually run, brought into the study under
+the same protocol. A ladder of log-price group medians is fitted on the training rows
+only: trim group (make, model, trim; at least 8 rows) -> model plus 2-year window (at
+least 8) -> model line (at least 5) -> make plus body style (at least 30) -> global
+median. Every car receives the first anchor its group supports (`log_anchor`), plus a
+state price index (state median minus global, states with at least 300 training rows).
+The booster is the study's standard LightGBM configuration with two additions: the two
+anchor features, and monotone decreasing constraints on `mileage` and `miles_per_year`
+(more miles can never raise a price, all else equal). Like `trim_tier`, the ladder is a
+fitted transform, re-learned inside every fold, so it can never leak evaluation rows.
+The anchor arrives as information only: the learner predicts the price directly and may
+disagree with the anchor by any amount. This is the configuration `train-production`
+deploys, fitted through the same code path (`zoo.fit_anchor_ladder`, `zoo.anchored_frame`,
+`zoo.anchored_params`) in both places.
+
+### 5.5 Anchored hybrid
+
+The robust configuration deployed pricing systems converge on, with the anchor as an
+**offset** rather than a feature. Stage 1 is the same fold-fitted anchor ladder as
+Section 5.4. The booster (the study's standard LightGBM with the same monotone
+constraints) is then trained on the residual `y - log_anchor`, seeing the anchor
+features plus a smoothed target encoding of the 3-digit region:
+`te(z) = (sum_z + 50 * global_mean) / (n_z + 50)`, computed on the regional residuals so
+it captures location effects beyond what the anchor already explains. For training rows
+the encoding is built inner-out-of-fold (5 inner folds, each row encoded by the other
+four), the standard guard against a target encoding memorising its own labels; for
+evaluation rows it is fitted on the full training partition. The final prediction is
+`log_anchor + clip(residual_hat, -0.75, +0.75)`: a car can never be priced further than
+about 2.1x from its own market group's anchor, which is what keeps rare and
+thinly-supported cars robust instead of extrapolated. The bound is a fixed constant,
+applied identically to a common sedan and to a fifteen-year-old truck. At corpus scale
+that costs about a MAPE point, entirely below $10,000, and the study reports the
+measurement rather than repairing the configuration after seeing the holdout: the
+ladder's first rung groups make, model and trim without a model-year term, so an old car
+inherits an anchor set by its newer siblings and the bound then forbids the learner from
+descending to its real price. 96% of this design's misses beyond 50% are
+over-predictions. A year-aware rung, or a bound scaled by within-group price dispersion,
+is the obvious correction and is future work rather than a silent edit to these numbers.
+
+### 5.6 Anchored blend
+
+Two independent residual-to-anchor engines over the identical stage 1 of Section 5.5:
+the monotone LightGBM, and the study's standard CatBoost configuration on raw category
+strings. Their residual predictions are averaged in log space (a geometric mean in
+price space) before the same +-0.75 bound is applied. The rationale is engine
+diversity: two boosters with different categorical handling make uncorrelated mistakes
+on thin groups, and averaging keeps the strengths of both. This is the configuration an
+internal engine bakeoff of five candidates (log-price, log-price + monotone, residual +
+monotone, residual blend, comps-blended) selected for deployment-style robustness;
+comps blending, the fifth candidate, degraded accuracy and survives only as the anchor
+ladder itself.
+
+At corpus scale the deep models train with batch 4096 for at most 20 epochs (the same
+early stopping applies); at 30x the pilot's data volume an epoch sees vastly more
+examples, and the pilot's 40-epoch budget would be wasted compute.
+
 ## 6. Uncertainty quantification
 
 **Split-conformal intervals (every model).** With OOF absolute residuals
@@ -129,22 +201,48 @@ predictions a base made for rows it was fitted on.
 `[exp(p - q), exp(p + q)]`. Marginal 80% coverage is guaranteed distribution-free
 under exchangeability; the holdout coverage table empirically verifies it.
 
-**Conformalised quantile regression (production champion).** LightGBM quantile models
+**Conformalised quantile regression (production configuration).** LightGBM quantile models
 (alpha 0.1 and 0.9, 1,200 rounds) are trained per fold; conformity scores
 `s_i = max(lo_i - y_i, y_i - hi_i)` on OOF predictions give a widening constant at the
 same corrected quantile, added to both quantile predictions. CQR keeps the coverage
 guarantee while letting the width adapt per car: wide for a rare old truck, narrow for
 a common commuter sedan.
 
-## 7. Statistical comparison
+## 7. Statistical comparison and error profiling
 
 Every model predicts the same holdout cars, so model differences are judged on paired
 errors. A paired bootstrap (4,000 resamples of holdout indices, the same draw applied
-to every model, seed 42) yields a 95% percentile interval for each model's MAPE and for
-its MAPE gap to the champion. A model whose gap interval includes zero is reported as
-statistically tied with the champion; the study never claims a ranking the data cannot
-support. Implemented in `src/appraisenet/compare.py`, re-runnable from the persisted
-prediction arrays without refitting.
+to every model, seed 42) yields a 95% percentile interval for each model's error and
+for its gap to the leader. A model whose gap interval includes zero is reported as
+statistically tied; the study never claims a ranking the data cannot support. Three
+things are inferred from the same draws:
+
+- **MAPE**, and each model's MAPE gap to the champion (`comparison_stats.csv`).
+- **Median APE**, and each model's median gap to the best median (same file). MAPE is a
+  mean and therefore a statement about the tail; the median is a statement about the
+  typical car. At corpus scale the two summaries name different winners, so reporting
+  only one of them would hide a real property of the field.
+- **Every pair**, not only the gap to the leader (`pairwise_mape.csv`): with 10 models
+  that is 45 intervals, because a claim about two models in the middle of the table
+  needs its own interval.
+
+Draws are generated one at a time rather than as one index matrix: 4,000 draws over a
+117,260-car holdout would otherwise allocate several gigabytes.
+
+`error_profiles` writes two further artifacts from the same prediction arrays, no
+refitting involved:
+
+- `error_profile.csv`: per model, the error percentiles (p50, p75, p90, p95, p99), the
+  share of cars inside 5 / 10 / 20%, the share missed by more than 25 / 50 / 100%, the
+  direction of the large misses (what fraction of misses beyond 50% are
+  over-predictions), and the share of total absolute percentage error contributed by
+  cars missed by more than 25%.
+- `price_bands.csv`: mean and median APE per model in four half-open price bands. The
+  bands are defined once in `compare.BANDS` and shared with the segment table, so a car
+  priced at exactly $20,000 lands in exactly one of them.
+
+All of it is implemented in `src/appraisenet/compare.py` and re-runnable from the
+persisted prediction arrays with `appraisenet report`.
 
 ## 8. Production learning loop
 
@@ -156,9 +254,17 @@ prediction arrays without refitting.
   CQR, then promotes only if holdout MAPE is within 0.30 points of the serving model;
   otherwise the candidate is archived and the old version keeps serving. Semantic
   versions, automatic minor bumps, previous versions kept for rollback. The production
-  configuration is the best text-free model (LightGBM plus CQR) rather than the study's
-  overall champion: the prediction API receives structured fields without a listing
-  description, so the deployed model is selected for the inputs it will actually see.
+  configuration is the best text-free model rather than the study's overall champion:
+  the prediction API receives structured fields without a listing description, so the
+  deployed model is selected for the inputs it will actually see. Since the corpus-scale
+  study that model is the **anchored LightGBM** of Section 5.4 (`registry.CONFIGURATION`):
+  statistically tied with the text hybrid it replaces, 0.025 MAPE points ahead of the
+  plain booster it replaced in the previous edition, monotone in mileage, and 29x cheaper
+  to fit than the champion blend. The staged artifact therefore contains `point.txt`,
+  `p10.txt`, `p90.txt`, `feature_space.joblib` and `anchor_ladder.joblib`; the serving
+  path applies the ladder to every request before predicting, and the quantile models
+  stay on the plain frame, bounding the anchored point estimate rather than re-deriving
+  it. A model staged before this change carries no ladder and is served unchanged.
 - **Serving** (`appraisenet serve`): FastAPI, point price + calibrated interval,
   hot-reload on promotion, every prediction logged.
 - **Drift** (`appraisenet monitor`): population-stability index between the training
@@ -170,10 +276,15 @@ prediction arrays without refitting.
 - Seeds are fixed (42 throughout; deep models additionally seed torch).
 - `appraisenet benchmark --config configs/default.yaml` re-runs the full study;
   `configs/smoke.yaml` is a 4-model subset for CI.
-- Every artifact needed to rebuild tables and figures is persisted:
-  `results.csv`, `comparison_stats.csv`, `segments.csv`, per-model prediction arrays,
-  `run_meta.json`, model cards. `appraisenet report` rebuilds figures and statistics
-  from artifacts alone.
+- Every artifact needed to rebuild tables and figures is persisted: `results.csv`,
+  `comparison_stats.csv`, `pairwise_mape.csv`, `error_profile.csv`, `price_bands.csv`,
+  `segments.csv`, per-model prediction arrays, `run_meta.json`, model cards.
+  `appraisenet report` rebuilds every statistic and figure from those artifacts alone,
+  with no refitting.
+- A corpus-scale run is checkpointed: `results.csv` and `predictions/*.npz` are written
+  after every model, and a relaunch resumes from them. A finished model is reused only
+  when its saved holdout provably matches the current split, so a changed corpus or
+  protocol always refits. The corpus tier took 39 hours on one workstation.
 - Without the private corpus, every command runs on the synthetic generator and is
   labelled as such in every output. CI never sees real data.
 

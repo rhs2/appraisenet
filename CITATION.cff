@@ -10,10 +10,13 @@ authors:
 repository-code: "https://github.com/rhs2/appraisenet"
 url: "https://rhs2.github.io/appraisenet/"
 license: MIT
-date-released: "2026-08-24"
+date-released: "2026-09-02"
+version: "2.0.0"
 keywords:
   - price-estimation
   - tabular-machine-learning
   - conformal-prediction
   - gradient-boosting
   - deep-learning
+  - evaluation-methodology
+  - data-scaling
