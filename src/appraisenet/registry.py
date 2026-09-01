@@ -1,7 +1,11 @@
 """Production model registry: fit, version, promote-or-rollback.
 
-`appraisenet train-production` fits the production configuration (LightGBM point model +
-p10/p90 quantile models + conformal calibration + the fitted FeatureSpace) and stages it.
+`appraisenet train-production` fits the production configuration and stages it: the
+anchored LightGBM point model (group-median anchor ladder + monotone mileage
+constraints), p10/p90 quantile models, conformal calibration and the fitted
+FeatureSpace. The configuration is the study's best *text-free* one at corpus scale;
+the overall champion reads the listing description, which an API caller pricing a car
+from its specification does not have.
 Promotion applies the guardrail: the candidate must match the serving model's holdout
 MAPE within a tolerance, otherwise the serving model stays and the candidate is archived.
 Versions are semantic: automatic retrains bump MINOR; MAJOR is a manual architecture
@@ -27,6 +31,7 @@ from .protocol import metrics
 CURRENT = ROOT / "models" / "current"
 ARCHIVE = ROOT / "models" / "archive"
 TOLERANCE = 0.30
+CONFIGURATION = "anchored_lgbm"
 
 
 def train_production(cfg: Config, force: bool = False) -> dict:
@@ -43,7 +48,7 @@ def train_production(cfg: Config, force: bool = False) -> dict:
     for k in range(cfg.protocol.folds):
         tr, ho = train[split.folds != k], train[split.folds == k]
         fs = FeatureSpace().fit(tr)
-        oof[split.folds == k] = zoo.fit_predict("lightgbm", tr, ho, fs, cfg)
+        oof[split.folds == k] = zoo.fit_predict(CONFIGURATION, tr, ho, fs, cfg)
         qm = zoo.quantile_models(tr, fs)
         frame = fs.tree_frame(ho)
         lo[split.folds == k] = qm["p10"].predict(frame)
@@ -54,7 +59,7 @@ def train_production(cfg: Config, force: bool = False) -> dict:
 
     # candidate metrics on the untouched holdout (trained on the training partition only)
     fs_train = FeatureSpace().fit(train)
-    hold_pred = zoo.fit_predict("lightgbm", train, hold, fs_train, cfg)
+    hold_pred = zoo.fit_predict(CONFIGURATION, train, hold, fs_train, cfg)
     cand = metrics(hold[TARGET].values, hold_pred)
 
     serving = current_meta()
@@ -66,8 +71,13 @@ def train_production(cfg: Config, force: bool = False) -> dict:
     # production fit on ALL rows (the honest metrics above stay those of the train-only fit)
     import lightgbm as lgb
     fs_all = FeatureSpace().fit(df)
-    point = lgb.train(zoo._lgbm_params(), lgb.Dataset(fs_all.tree_frame(df), df[TARGET].values),
+    y_all = df[TARGET].values
+    ladder = zoo.fit_anchor_ladder(df, y_all)
+    X_all = zoo.anchored_frame(fs_all, df, ladder)
+    point = lgb.train(zoo.anchored_params(X_all.columns), lgb.Dataset(X_all, y_all),
                       num_boost_round=1500)
+    # the interval models stay on the plain frame: they bound the anchored point estimate
+    # rather than re-deriving it, and the conformal step above was calibrated the same way
     qm = zoo.quantile_models(df, fs_all)
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
@@ -81,13 +91,15 @@ def train_production(cfg: Config, force: bool = False) -> dict:
     qm["p10"].save_model(str(CURRENT / "p10.txt"))
     qm["p90"].save_model(str(CURRENT / "p90.txt"))
     joblib.dump(fs_all, CURRENT / "feature_space.joblib")
+    joblib.dump(ladder, CURRENT / "anchor_ladder.joblib")
     if serving.get("version"):
         m = re.match(r"(\d+)\.(\d+)\.(\d+)", str(serving["version"]))
         version = f"{m.group(1)}.{int(m.group(2)) + 1}.0" if m else "1.0.0"
     else:
         version = "1.0.0"
-    meta = {"version": version, "trained": stamp,
+    meta = {"version": version, "trained": stamp, "configuration": CONFIGURATION,
             "rows": len(df), "synthetic": bool(synthetic), "holdout": cand,
+            "out_of_fold": metrics(y, oof),
             "cqr_widen_log": round(cqr_q, 4), "target_coverage": tc,
             "decision": "promoted"}
     (CURRENT / "meta.json").write_text(json.dumps(meta, indent=1))
@@ -119,13 +131,19 @@ class ProductionModel:
         self.p10 = lgb.Booster(model_file=str(CURRENT / "p10.txt"))
         self.p90 = lgb.Booster(model_file=str(CURRENT / "p90.txt"))
         self.fs: FeatureSpace = joblib.load(CURRENT / "feature_space.joblib")
+        # models staged before the anchored retarget carry no ladder: serve them as they were
+        ladder_path = CURRENT / "anchor_ladder.joblib"
+        self.ladder = joblib.load(ladder_path) if ladder_path.exists() else None
         self._mtime = (CURRENT / "meta.json").stat().st_mtime
 
     def predict(self, frame) -> dict:
-        X = self.fs.tree_frame(frame)
+        from .models import zoo
+        X = zoo.anchored_frame(self.fs, frame, self.ladder) if self.ladder is not None \
+            else self.fs.tree_frame(frame)
         q = self.meta["cqr_widen_log"]
+        plain = self.fs.tree_frame(frame)
         price = float(np.exp(self.point.predict(X)[0]))
-        low = float(np.exp(self.p10.predict(X)[0] - q))
-        high = float(np.exp(self.p90.predict(X)[0] + q))
+        low = float(np.exp(self.p10.predict(plain)[0] - q))
+        high = float(np.exp(self.p90.predict(plain)[0] + q))
         return {"price": round(price), "low": round(min(low, price)), "high": round(max(high, price)),
                 "coverage": self.meta["target_coverage"], "model_version": self.meta["version"]}
