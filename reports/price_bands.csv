@@ -1,0 +1,41 @@
+band,n,model,mape_pct,median_ape_pct
+under $10k,7778,blend_lgbm_catboost,20.785,13.849
+under $10k,7778,anchored_lgbm,20.914,13.937
+under $10k,7778,hybrid_lgbm_text,20.9,13.802
+under $10k,7778,xgboost,21.295,13.946
+under $10k,7778,lightgbm,21.008,13.928
+under $10k,7778,embed_mlp,20.868,13.783
+under $10k,7778,catboost,21.108,14.319
+under $10k,7778,ft_transformer,20.285,13.943
+under $10k,7778,anchored_blend,33.861,17.396
+under $10k,7778,anchored_hybrid,34.134,17.466
+$10k-20k,24894,blend_lgbm_catboost,9.263,6.667
+$10k-20k,24894,anchored_lgbm,9.37,6.796
+$10k-20k,24894,hybrid_lgbm_text,9.325,6.762
+$10k-20k,24894,xgboost,9.39,6.835
+$10k-20k,24894,lightgbm,9.37,6.784
+$10k-20k,24894,embed_mlp,9.609,6.956
+$10k-20k,24894,catboost,9.541,6.956
+$10k-20k,24894,ft_transformer,9.654,6.981
+$10k-20k,24894,anchored_blend,10.033,6.857
+$10k-20k,24894,anchored_hybrid,10.206,7.016
+$20k-40k,60069,blend_lgbm_catboost,5.48,4.085
+$20k-40k,60069,anchored_lgbm,5.514,4.107
+$20k-40k,60069,hybrid_lgbm_text,5.55,4.146
+$20k-40k,60069,xgboost,5.546,4.169
+$20k-40k,60069,lightgbm,5.559,4.152
+$20k-40k,60069,embed_mlp,5.659,4.214
+$20k-40k,60069,catboost,5.679,4.256
+$20k-40k,60069,ft_transformer,6.074,4.584
+$20k-40k,60069,anchored_blend,5.398,4.006
+$20k-40k,60069,anchored_hybrid,5.453,4.044
+over $40k,24519,blend_lgbm_catboost,5.31,3.926
+over $40k,24519,anchored_lgbm,5.32,3.883
+over $40k,24519,hybrid_lgbm_text,5.288,3.815
+over $40k,24519,xgboost,5.186,3.775
+over $40k,24519,lightgbm,5.299,3.825
+over $40k,24519,embed_mlp,5.394,3.95
+over $40k,24519,catboost,5.677,4.266
+over $40k,24519,ft_transformer,6.075,4.521
+over $40k,24519,anchored_blend,5.236,3.775
+over $40k,24519,anchored_hybrid,5.267,3.775

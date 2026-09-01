@@ -1,14 +1,14 @@
 # Model card: lightgbm
 
 - family: boosting
-- protocol: 1,174,659 listings, 1,057,399 train / 117,260 holdout,
+- protocol: 38,758 listings, 34,865 train / 3,893 holdout,
   5-fold out-of-fold selection, holdout scored once (private dataset)
-- cross-validation: MAPE 7.341%, median APE 4.782%, R2(log) 0.959
-- holdout: MAPE 7.338%, median APE 4.763%,
-  R2(log) 0.959, within 10%: 78.625%
-- 80% conformal interval on the holdout: coverage 80.1%,
-  median width 21.0% of price
-- fit time (protocol total): 347.9 s
+- cross-validation: MAPE 11.399%, median APE 7.792%, R2(log) 0.926
+- holdout: MAPE 11.243%, median APE 7.631%,
+  R2(log) 0.926, within 10%: 60.622%
+- 80% conformal interval on the holdout: coverage 79.6%,
+  median width 34.9% of price
+- fit time (protocol total): 101.1 s
 - intended use: research comparison; the production configuration is documented in the README
 - limitations: US market, $2,000-$100,000 price band, model year 1990+;
   no collector or exotic vehicles; asking prices, not transaction prices

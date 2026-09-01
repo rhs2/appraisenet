@@ -42,7 +42,13 @@ reports/runs.jsonl
 # the study's published evidence IS committed
 !reports/results.csv
 !reports/comparison_stats.csv
+!reports/pairwise_mape.csv
+!reports/error_profile.csv
+!reports/price_bands.csv
 !reports/segments.csv
+# the 38,758-row pilot study's evidence stays committed alongside the corpus-scale run
+!reports/pilot/
+!reports/pilot/*.csv
 logs/
 
 # figures are regenerated; committed ones live in docs/ only
@@ -52,6 +58,9 @@ reports/figures/
 *.pdf
 *.docx
 !docs/*.pdf
+# archived editions of the paper stay as committed reference
+!paper/archive/**/*.pdf
+!paper/archive/**/*.docx
 paper/main.log
 paper/main.aux
 paper/title.tex

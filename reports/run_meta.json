@@ -1,14 +1,14 @@
 {
- "generated": "2026-08-23T23:58:13+00:00",
- "rows": 38758,
- "train": 34865,
- "holdout": 3893,
+ "generated": "2026-09-01T16:13:08+00:00",
+ "rows": 1174659,
+ "train": 1057399,
+ "holdout": 117260,
  "synthetic": false,
  "config": "default",
- "platform": "macOS-26.5.2-arm64-arm-64bit",
+ "platform": "Windows-11-10.0.26200-SP0",
  "cqr": {
-  "cqr_widen_log": 0.0324,
-  "cqr_holdout_coverage_pct": 80.2,
-  "cqr_holdout_width_pct_of_price": 33.3
+  "cqr_widen_log": 0.0044,
+  "cqr_holdout_coverage_pct": 80.4,
+  "cqr_holdout_width_pct_of_price": 18.2
  }
 }

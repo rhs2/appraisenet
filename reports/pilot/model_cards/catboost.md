@@ -1,14 +1,14 @@
 # Model card: catboost
 
 - family: boosting
-- protocol: 1,174,659 listings, 1,057,399 train / 117,260 holdout,
+- protocol: 38,758 listings, 34,865 train / 3,893 holdout,
   5-fold out-of-fold selection, holdout scored once (private dataset)
-- cross-validation: MAPE 7.538%, median APE 5.011%, R2(log) 0.958
-- holdout: MAPE 7.522%, median APE 4.973%,
-  R2(log) 0.958, within 10%: 77.57%
-- 80% conformal interval on the holdout: coverage 80.1%,
-  median width 21.7% of price
-- fit time (protocol total): 12761.4 s
+- cross-validation: MAPE 11.584%, median APE 8.024%, R2(log) 0.925
+- holdout: MAPE 11.582%, median APE 8.046%,
+  R2(log) 0.925, within 10%: 58.181%
+- 80% conformal interval on the holdout: coverage 80.0%,
+  median width 35.5% of price
+- fit time (protocol total): 367.0 s
 - intended use: research comparison; the production configuration is documented in the README
 - limitations: US market, $2,000-$100,000 price band, model year 1990+;
   no collector or exotic vehicles; asking prices, not transaction prices

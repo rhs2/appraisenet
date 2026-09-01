@@ -1,0 +1,14 @@
+model,holdout_mape_pct,mape_ci95_low,mape_ci95_high,delta_vs_champion,delta_ci95_low,delta_ci95_high,tied_with_champion
+hybrid_lgbm_text,10.754,10.402,11.122,0.0,0.0,0.0,True
+stack,11.019,10.655,11.395,0.265,0.149,0.382,False
+blend_lgbm_catboost,11.081,10.715,11.449,0.327,0.185,0.478,False
+xgboost,11.19,10.811,11.571,0.436,0.263,0.61,False
+lightgbm,11.243,10.877,11.621,0.489,0.402,0.58,False
+catboost,11.582,11.191,11.977,0.828,0.597,1.063,False
+embed_mlp,11.944,11.551,12.336,1.19,0.926,1.451,False
+ft_transformer,12.357,11.953,12.763,1.603,1.322,1.89,False
+extra_trees,12.877,12.44,13.317,2.124,1.818,2.44,False
+random_forest,13.495,13.031,13.967,2.741,2.408,3.083,False
+knn_comparables,15.216,14.736,15.715,4.462,4.057,4.879,False
+ridge,18.935,18.342,19.526,8.181,7.672,8.713,False
+elasticnet,19.418,18.791,20.041,8.664,8.117,9.211,False

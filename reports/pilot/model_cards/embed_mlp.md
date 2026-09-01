@@ -1,14 +1,14 @@
 # Model card: embed_mlp
 
 - family: deep tabular
-- protocol: 1,174,659 listings, 1,057,399 train / 117,260 holdout,
+- protocol: 38,758 listings, 34,865 train / 3,893 holdout,
   5-fold out-of-fold selection, holdout scored once (private dataset)
-- cross-validation: MAPE 7.498%, median APE 4.908%, R2(log) 0.957
-- holdout: MAPE 7.451%, median APE 4.856%,
-  R2(log) 0.957, within 10%: 77.932%
-- 80% conformal interval on the holdout: coverage 80.3%,
-  median width 21.5% of price
-- fit time (protocol total): 1431.2 s
+- cross-validation: MAPE 12.194%, median APE 8.447%, R2(log) 0.917
+- holdout: MAPE 11.944%, median APE 8.438%,
+  R2(log) 0.92, within 10%: 56.666%
+- 80% conformal interval on the holdout: coverage 79.9%,
+  median width 37.2% of price
+- fit time (protocol total): 41.9 s
 - intended use: research comparison; the production configuration is documented in the README
 - limitations: US market, $2,000-$100,000 price band, model year 1990+;
   no collector or exotic vehicles; asking prices, not transaction prices
