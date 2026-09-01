@@ -1,11 +1,13 @@
 # Data
 
-The private corpus (`listings.db`) is **not distributed**. It contains 38,758 US
+The private corpus (`listings.db`) is **not distributed**. It contains 1,174,659 US
 used-vehicle listings collected from public marketplaces and dealer websites during
-July-August 2026, VIN-decoded specifications via the free NHTSA vPIC API, deduplicated
-per vehicle and cleaned through documented quality gates (price band $2,000-$100,000,
-model year 1990+, no collector or exotic vehicles, placeholder prices and
-not-road-ready listings removed, label-noise quarantine).
+July and August 2026 (and growing daily through the ingest path), VIN-decoded
+specifications via the free NHTSA vPIC API, deduplicated per vehicle and cleaned
+through documented quality gates (price band $2,000-$100,000, model year 1990+, no
+collector or exotic vehicles, placeholder prices and not-road-ready listings removed,
+label-noise quarantine). The study's first edition ran on the 38,758-listing corpus of
+late August 2026; that snapshot's results remain committed under `reports/pilot/`.
 
 Identity was stripped before the database ever reached this project: no VINs, no listing
 IDs, no seller or platform names, ZIP codes reduced to their 3-digit prefix, and free
@@ -17,7 +19,7 @@ The data did not start clean, and the curation is as much a part of this study a
 models. Each raw listing record arrived with roughly **160 fields**: site-specific
 presentation fields, duplicated spec fields in inconsistent formats, sparse columns that
 existed on one source only, and seller-entered specs that contradict the VIN. The
-pipeline that produced the 26-column modeling table:
+pipeline that produced the 29-column modeling table:
 
 1. **Field triage**: presentation-only, near-empty and redundant fields dropped; every
    surviving column normalised to one vocabulary (fuel types, transmissions, drivetrains,
@@ -58,6 +60,15 @@ Table `listings`, one row per vehicle:
 | cylinders, doors, displacement_l, engine_hp | numeric specs (VIN-decoded first) |
 | gvwr_class, series, electrification, adaptive_cruise, plant_country | VIN-decoded extras |
 | original_price | pre-markdown price when the listing showed one |
+| msrp | manufacturer sticker price for the year/make/model/trim, where known |
+| days_listed | days on market at collection time |
+| price_changes | number of price cuts observed on the listing |
+
+Two fields the raw feed carries are deliberately **excluded** from the corpus: the
+listing's first asking price and the derived percentage drop. Together with the number
+of price changes they determine the current price almost exactly, so a model given them
+would be reading the label, not pricing the car. The count of price cuts alone carries
+demand signal without the identity, and is kept.
 | region_state, region_zip3 | coarse location for regional effects |
 | description | scrubbed listing text |
 

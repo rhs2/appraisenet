@@ -50,6 +50,9 @@ class Listing(BaseModel):
     engine_hp: float | None = None
     displacement_l: float | None = None
     original_price: float | None = None
+    msrp: float | None = None
+    days_listed: float | None = None
+    price_changes: float | None = None
 
 
 @app.get("/health")

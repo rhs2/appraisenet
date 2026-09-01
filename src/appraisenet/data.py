@@ -13,10 +13,13 @@ Columns (table `listings`): id, price (target, USD), year, make, model, trim, mi
 seller_type (dealer|private), condition (used|cpo), body_style, fuel_type, transmission,
 drivetrain, cylinders, doors, displacement_l, engine_hp, gvwr_class, series,
 electrification, adaptive_cruise, plant_country, original_price, region_state,
-region_zip3, description (scrubbed free text).
+region_zip3, description (scrubbed free text), msrp (manufacturer sticker for the
+year/make/model/trim where known), days_listed (days on market at collection),
+price_changes (number of price cuts observed on the listing).
 """
 from __future__ import annotations
 
+import zlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -29,7 +32,7 @@ CATEGORICAL = ["make", "model", "trim", "body_style", "drivetrain", "transmissio
                "electrification", "gvwr_class", "series", "plant_country", "adaptive_cruise",
                "seller_type", "region_state"]
 NUMERIC = ["mileage", "age", "miles_per_year", "doors", "cylinders", "engine_hp",
-           "displacement_l", "original_price"]
+           "displacement_l", "original_price", "msrp", "days_listed", "price_changes"]
 TARGET = "log_price"
 
 
@@ -112,7 +115,7 @@ def synthetic_listings(n: int = 6000, seed: int = 7) -> pd.DataFrame:
         age = max(2026 - year, 0)
         mileage = max(int(rng.normal(12_000 * age, 8_000)), 5)
         trim, trim_mult = _TRIMS[rng.randint(len(_TRIMS))]
-        body = _BODY[hash(model) % len(_BODY)]
+        body = _BODY[zlib.crc32(model.encode()) % len(_BODY)]  # stable across processes (hash() is salted)
         seller = "dealer" if rng.rand() < 0.85 else "private"
         hp = int(np.clip(rng.normal(120 + 60 * brand_mult + (30 if body == "Truck" else 0), 40), 70, 700))
         base = 34_000 * brand_mult * (1 + trim_mult) * (1.15 if body == "Truck" else 1.0)
@@ -134,5 +137,7 @@ def synthetic_listings(n: int = 6000, seed: int = 7) -> pd.DataFrame:
             plant_country=rng.choice(["UNITED STATES (USA)", "JAPAN", "MEXICO"]),
             original_price=None, region_state=rng.choice(_STATES),
             region_zip3=str(rng.randint(900, 935)), description=desc,
+            msrp=int(base * rng.uniform(1.02, 1.15)) if rng.rand() < 0.55 else None,
+            days_listed=int(rng.randint(1, 120)), price_changes=int(rng.poisson(0.6)),
         ))
     return pd.DataFrame(rows)

@@ -1,0 +1,15 @@
+# the pilot tier: the ENTIRE zoo (memory- and distance-bounded baselines included) at a
+# scale one 8 GB machine can hold. The corpus-scale study is configs/default.yaml.
+name: pilot
+models: []            # empty = the entire zoo
+max_rows: 40000
+protocol:
+  seed: 42
+  holdout_frac: 0.10
+  folds: 5
+  price_min: 2000
+  price_max: 100000
+  year_min: 1990
+  target_coverage: 0.80
+torch_epochs: 40
+torch_batch: 1024

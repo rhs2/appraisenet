@@ -1,6 +1,9 @@
-# the full study on the private dataset
+# the corpus-scale study: every model that can ride the full corpus on one machine.
+# The classical baselines (linear, k-NN, bagged trees) are quadratic in memory or
+# distance computations at this scale; they run in the pilot tier (configs/pilot.yaml).
 name: default
-models: []            # empty = the entire zoo
+models: [anchored_blend, anchored_hybrid, anchored_lgbm, hybrid_lgbm_text,
+         blend_lgbm_catboost, lightgbm, xgboost, catboost, embed_mlp, ft_transformer]
 protocol:
   seed: 42
   holdout_frac: 0.10
@@ -9,5 +12,5 @@ protocol:
   price_max: 100000
   year_min: 1990
   target_coverage: 0.80
-torch_epochs: 40
-torch_batch: 1024
+torch_epochs: 20
+torch_batch: 4096

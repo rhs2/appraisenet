@@ -33,7 +33,8 @@ CANONICAL = ["id", "price", "year", "make", "model", "trim", "mileage", "seller_
              "condition", "body_style", "fuel_type", "transmission", "drivetrain",
              "cylinders", "doors", "displacement_l", "engine_hp", "gvwr_class", "series",
              "electrification", "adaptive_cruise", "plant_country", "original_price",
-             "region_state", "region_zip3", "description"]
+             "region_state", "region_zip3", "description", "msrp", "days_listed",
+             "price_changes"]
 
 
 def db_url() -> str:

@@ -87,17 +87,26 @@ def fit_predict(name: str, train: pd.DataFrame, ev: pd.DataFrame, fs: FeatureSpa
         return _hybrid_text(train, ev, fs, cfg, y_col)
     if name == "stack":
         return _stack(train, ev, fs, cfg, y_col)
+    if name == "anchored_lgbm":
+        return _anchored_lgbm(train, ev, fs, cfg, y_col)
+    if name == "anchored_hybrid":
+        return _anchored_hybrid(train, ev, fs, cfg, y_col)
+    if name == "anchored_blend":
+        return _anchored_blend(train, ev, fs, cfg, y_col)
     raise KeyError(f"unknown model '{name}'")
 
 
 ZOO = ["ridge", "elasticnet", "knn_comparables", "random_forest", "extra_trees",
        "lightgbm", "xgboost", "catboost", "embed_mlp", "ft_transformer",
-       "blend_lgbm_catboost", "hybrid_lgbm_text", "stack"]
+       "blend_lgbm_catboost", "hybrid_lgbm_text", "stack", "anchored_lgbm",
+       "anchored_hybrid", "anchored_blend"]
 FAMILY = {"ridge": "linear", "elasticnet": "linear", "knn_comparables": "instance",
           "random_forest": "bagged trees", "extra_trees": "bagged trees",
           "lightgbm": "boosting", "xgboost": "boosting", "catboost": "boosting",
           "embed_mlp": "deep tabular", "ft_transformer": "deep tabular",
-          "blend_lgbm_catboost": "hybrid", "hybrid_lgbm_text": "hybrid", "stack": "hybrid"}
+          "blend_lgbm_catboost": "hybrid", "hybrid_lgbm_text": "hybrid", "stack": "hybrid",
+          "anchored_lgbm": "anchored", "anchored_hybrid": "anchored",
+          "anchored_blend": "anchored"}
 
 
 def _hybrid_text(train, ev, fs, cfg, y_col):
@@ -143,6 +152,197 @@ def _stack(train, ev, fs, cfg, y_col):
     meta = Ridge(alpha=1.0).fit(oof, train[y_col].values)
     evp = np.column_stack([fit_predict(b, train, ev, fs, cfg, y_col) for b in bases])
     return meta.predict(evp)
+
+
+class _AnchorLadder:
+    """Fold-fitted group-median anchors, the way deployed pricing systems seed a learner.
+
+    A ladder of log-price medians computed on the TRAINING rows only: trim group ->
+    model + 2-year window -> model line -> make + body style -> global. Each row gets the
+    first anchor its group supports, plus a train-fitted state price index. Fitted per
+    fold like every other statistic in the protocol, so it can never leak evaluation rows.
+    """
+
+    LADDER = [(["make", "model", "trim"], 8), (["make", "model", "_yb"], 8),
+              (["make", "model"], 5), (["make", "body_style"], 30)]
+
+    @staticmethod
+    def _key(df, cols):
+        s = df[cols[0]].astype("string").str.lower().fillna("~")
+        for c in cols[1:]:
+            s = s + "|" + df[c].astype("string").str.lower().fillna("~")
+        return s
+
+    @staticmethod
+    def _prep(df):
+        d = df.copy()
+        d["_yb"] = (pd.to_numeric(d["year"], errors="coerce") // 2).astype("Int64").astype("string")
+        return d
+
+    def fit(self, train: pd.DataFrame, y: np.ndarray) -> "_AnchorLadder":
+        d = self._prep(train)
+        lp = pd.Series(y, index=d.index)
+        self.maps = []
+        for cols, min_n in self.LADDER:
+            g = lp.groupby(self._key(d, cols)).agg(["median", "count"])
+            self.maps.append((cols, g.loc[g["count"] >= min_n, "median"]))
+        self.global_med = float(np.median(y))
+        st = lp.groupby(d["region_state"].astype("string").str.upper().fillna("~")).agg(["median", "count"])
+        self.state_idx = (st.loc[st["count"] >= 300, "median"] - self.global_med)
+        return self
+
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        d = self._prep(df)
+        anchor = pd.Series(np.nan, index=d.index)
+        for cols, m in self.maps:
+            need = anchor.isna()
+            if not need.any():
+                break
+            anchor[need] = self._key(d[need], cols).map(m)
+        anchor = anchor.fillna(self.global_med)
+        sidx = d["region_state"].astype("string").str.upper().fillna("~").map(self.state_idx).fillna(0.0)
+        return pd.DataFrame({"log_anchor": anchor.values, "state_idx": sidx.values}, index=df.index)
+
+
+def fit_anchor_ladder(train: pd.DataFrame, y: np.ndarray) -> "_AnchorLadder":
+    """Fit the anchor ladder on training rows. Public because the production registry
+    persists a ladder alongside the booster and applies it at serving time."""
+    return _AnchorLadder().fit(train, y)
+
+
+def anchored_frame(fs: FeatureSpace, df: pd.DataFrame, ladder: "_AnchorLadder") -> pd.DataFrame:
+    """The tree frame plus the two anchor columns, in the order the booster expects."""
+    return pd.concat([fs.tree_frame(df), ladder.transform(df)], axis=1)
+
+
+def anchored_params(columns) -> dict:
+    """LightGBM parameters for the anchored configuration: the study defaults plus
+    monotone decreasing constraints on mileage and miles per year."""
+    p = _lgbm_params()
+    p["monotone_constraints"] = [(-1 if c in ("mileage", "miles_per_year") else 0) for c in columns]
+    return p
+
+
+def _anchored_lgbm(train, ev, fs, cfg, y_col):
+    """LightGBM seeded with fold-fitted anchors + a monotone mileage constraint.
+
+    Mirrors the configuration deployed pricing systems actually run: the anchor ladder
+    hands the booster a market baseline for every car (so rare models are priced against
+    their group, not extrapolated), and monotone constraints on mileage and miles_per_year
+    encode that more miles can never raise a price, all else equal. This is the
+    configuration `train-production` deploys, fitted here through the same code path.
+    """
+    import lightgbm as lgb
+
+    y = train[y_col].values
+    ladder = fit_anchor_ladder(train, y)
+    Xt, Xe = anchored_frame(fs, train, ladder), anchored_frame(fs, ev, ladder)
+    m = lgb.train(anchored_params(Xt.columns), lgb.Dataset(Xt, y), num_boost_round=1500)
+    return m.predict(Xe)
+
+
+class _Zip3TE:
+    """Smoothed target encoding of the 3-digit region, fitted on training rows only.
+
+    te(z) = (sum_z + m * global_mean) / (n_z + m), m = 50: a region with few cars shrinks
+    to the global mean, a region with thousands speaks for itself. For TRAINING rows the
+    encoding is built inner-out-of-fold (5 inner folds; each row is encoded by the other
+    folds), the standard guard against a target encoding memorising its own labels.
+    """
+
+    def __init__(self, m: float = 50.0):
+        self.m = m
+
+    def fit(self, df: pd.DataFrame, y: np.ndarray) -> "_Zip3TE":
+        z = df["region_zip3"].astype("string").fillna("~")
+        g = pd.DataFrame({"z": z.values, "y": y}).groupby("z")["y"].agg(["sum", "count"])
+        self.global_mean = float(np.mean(y))
+        self.sums, self.counts = g["sum"], g["count"]
+        return self
+
+    def transform(self, df: pd.DataFrame) -> np.ndarray:
+        z = df["region_zip3"].astype("string").fillna("~")
+        s = z.map(self.sums).fillna(0.0).astype(float)
+        c = z.map(self.counts).fillna(0.0).astype(float)
+        return ((s + self.m * self.global_mean) / (c + self.m)).values
+
+
+def _anchor_setup(train, ev, fs, y_col):
+    """Shared stage 1 for the residual-to-anchor engines: fold-fitted ladder, residual
+    target, inner-OOF zip3 target encoding, and the augmented tree frames."""
+    y = train[y_col].values
+    ladder = _AnchorLadder().fit(train, y)
+    at, ae = ladder.transform(train), ladder.transform(ev)
+    r = y - at["log_anchor"].values
+
+    rng = np.random.RandomState(42)
+    inner = rng.randint(0, 5, len(train))
+    te_tr = np.zeros(len(train))
+    for k in range(5):
+        m = inner == k
+        te_tr[m] = _Zip3TE().fit(train[~m], r[~m]).transform(train[m])
+    te_full = _Zip3TE().fit(train, r)
+
+    def frame(df, anchors, te_vals):
+        X = fs.tree_frame(df).copy()
+        X["log_anchor"] = anchors["log_anchor"].values
+        X["state_idx"] = anchors["state_idx"].values
+        X["zip3_te"] = te_vals
+        return X
+
+    return r, ae, frame(train, at, te_tr), frame(ev, ae, te_full.transform(ev))
+
+
+def _resid_lgbm(Xt, r, Xe):
+    """The monotone LightGBM residual engine over anchor-augmented frames."""
+    import lightgbm as lgb
+    p = _lgbm_params()
+    p["monotone_constraints"] = [(-1 if c in ("mileage", "miles_per_year") else 0) for c in Xt.columns]
+    m = lgb.train(p, lgb.Dataset(Xt, r), num_boost_round=1500)
+    return m.predict(Xe)
+
+
+def _anchored_hybrid(train, ev, fs, cfg, y_col):
+    """The robust production hybrid: the anchor as an OFFSET, not just a feature.
+
+    The deployed configuration this mirrors prices a car as its market group's anchor
+    plus a learned, bounded deviation. Stage 1 is the fold-fitted anchor ladder; the
+    booster (same LightGBM configuration, monotone mileage) is then trained on the
+    RESIDUAL y - log_anchor, with the anchor features and an inner-OOF zip3 target
+    encoding of the regional residual among its inputs. The final prediction is
+    anchor + clip(residual_hat, +-0.75): a car can never be priced further than about
+    2.1x away from its own market group, which is what keeps rare cars robust.
+    """
+    r, ae, Xt, Xe = _anchor_setup(train, ev, fs, y_col)
+    return ae["log_anchor"].values + np.clip(_resid_lgbm(Xt, r, Xe), -0.75, 0.75)
+
+
+def _anchored_blend(train, ev, fs, cfg, y_col):
+    """Two residual-to-anchor engines blended: the bakeoff configuration deployed
+    systems converge on.
+
+    The same stage 1 as the anchored hybrid feeds two independent residual engines:
+    the monotone LightGBM, and CatBoost (the study's standard CatBoost configuration)
+    on raw category strings. Their residual predictions are averaged in log space (a
+    geometric mean in price space) before the same +-0.75 bound is applied. Two engines
+    with different categorical handling make uncorrelated mistakes on thin groups;
+    the average keeps the strengths of both.
+    """
+    from catboost import CatBoostRegressor
+
+    r, ae, Xt, Xe = _anchor_setup(train, ev, fs, y_col)
+    r_lgb = _resid_lgbm(Xt, r, Xe)
+
+    def cb_frame(X):
+        C = X.copy()
+        for c in fs.cat_cols:
+            C[c] = C[c].astype("string").fillna("NA").astype(str)
+        return C
+    cb = CatBoostRegressor(iterations=2500, learning_rate=0.05, depth=8, loss_function="RMSE",
+                           random_seed=42, verbose=0, thread_count=-1, cat_features=fs.cat_cols)
+    cb.fit(cb_frame(Xt), r)
+    r_cat = cb.predict(cb_frame(Xe))
+    return ae["log_anchor"].values + np.clip(0.5 * r_lgb + 0.5 * r_cat, -0.75, 0.75)
 
 
 def quantile_models(train: pd.DataFrame, fs: FeatureSpace, y_col: str = TARGET):
