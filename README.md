@@ -9,7 +9,7 @@ under the AppraiseNet Evaluation Protocol, wrapped in a production learning loop
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 **Project page:** [rhs2.github.io/appraisenet](https://rhs2.github.io/appraisenet/) ·
-**Paper:** [PDF](docs/Sium_Finstuen_2026_AppraiseNet.pdf) / [read online](https://rhs2.github.io/appraisenet/paper.html)
+**Paper:** [PDF](https://rhs2.github.io/appraisenet/Sium_Finstuen_2026_AppraiseNet.pdf?v=944b6263) · [read online](https://rhs2.github.io/appraisenet/paper.html)
 
 AppraiseNet asks a question every applied pricing team faces: *which learning approach
 actually prices cars best, how does the answer change when the corpus grows 30-fold, and
@@ -30,7 +30,7 @@ median error in the field and the worst mean**, because bounding a residual arou
 group anchor traps the cheapest cars above their price. And the differences that survive
 a bootstrap on 117,260 cars are small enough that compute matters more than rank, so
 production deploys the second-place configuration at 1/29th of the champion's fit time.
-The paper works all three through: [PDF](docs/Sium_Finstuen_2026_AppraiseNet.pdf).
+The paper works all three through.
 
 <!-- RESULTS:BEGIN -->
 ## Results

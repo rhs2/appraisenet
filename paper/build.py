@@ -6,6 +6,7 @@ The built PDF is also copied into docs/ so GitHub Pages serves it.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 import subprocess
@@ -91,6 +92,26 @@ SITENAV = ('<nav class="sitenav"><a href="index.html">Project page</a> '
            '<a href="https://github.com/rhs2/appraisenet">Code</a></nav>\n')
 
 
+def _stamp_pdf_links(pdf: Path) -> None:
+    """Point every PDF link at the freshly built file.
+
+    The paper keeps one filename for its whole life, so a reader who downloaded an
+    earlier edition, and the Pages CDN in front of them, will happily serve that
+    cached copy forever. Stamping a content digest on the link changes the URL
+    whenever the bytes change, which is the only thing a cache reacts to.
+    """
+    digest = hashlib.md5(pdf.read_bytes()).hexdigest()[:8]
+    pattern = re.compile(re.escape(FILE) + r"\.pdf(\?v=[0-9a-f]+)?")
+    for path in (DOCS / "index.html", DOCS / "paper.html", ROOT / "README.md"):
+        if not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8")
+        stamped = pattern.sub(f"{FILE}.pdf?v={digest}", text)
+        if stamped != text:
+            path.write_text(stamped, encoding="utf-8")
+    print(f"PDF links stamped ?v={digest}")
+
+
 def main() -> int:
     run([sys.executable, str(PAPER / "make_tables.py")], ROOT)
     title_tex = PAPER / "title.tex"
@@ -128,6 +149,7 @@ def main() -> int:
         plain.unlink(missing_ok=True)
     else:
         print("pandoc not found; DOCX and HTML skipped")
+    _stamp_pdf_links(pdf)   # last: pandoc rewrites paper.html and would drop the digest
     for junk in ("main.log", "main.aux", "title.tex"):
         (PAPER / junk).unlink(missing_ok=True)
     return 0
